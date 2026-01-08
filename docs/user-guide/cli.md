@@ -139,14 +139,14 @@ pycropwat \
 
 ## Common GEE Assets
 
-| Dataset           | Asset ID                                                   | Precipitation Band         | Scale Factor | Resolution |
-|-------------------|------------------------------------------------------------|----------------------------|--------------|------------|
-| ERA5-Land Monthly | `ECMWF/ERA5_LAND/MONTHLY_AGGR`                             | `total_precipitation_sum`  | 1000         | ~11 km     |
-| TerraClimate      | `IDAHO_EPSCOR/TERRACLIMATE`                                | `pr`                       | 1            | ~4 km      |
-| CHIRPS Daily      | `UCSB-CHG/CHIRPS/DAILY`                                    | `precipitation`            | 1            | ~5.5 km    |
-| CHIRPS Pentad     | `UCSB-CHG/CHIRPS/PENTAD`                                   | `precipitation`            | 1            | ~5.5 km    |
-| GPM IMERG         | `NASA/GPM_L3/IMERG_MONTHLY_V06`                            | `precipitation`            | 1            | ~10 km     |
-| AgERA5            | `projects/climate-engine-pro/assets/ce-ag-era5-v2/daily`   | `Precipitation_Flux`       | 1            | ~9 km      |
+| Dataset | Asset ID | Precipitation Band | Scale Factor | Resolution |
+|---------|----------|-------------------|--------------|------------|
+| ERA5-Land Monthly | ECMWF/ERA5_LAND/MONTHLY_AGGR | total_precipitation_sum | 1000 | ~11 km |
+| TerraClimate | IDAHO_EPSCOR/TERRACLIMATE | pr | 1 | ~4 km |
+| CHIRPS Daily | UCSB-CHG/CHIRPS/DAILY | precipitation | 1 | ~5.5 km |
+| CHIRPS Pentad | UCSB-CHG/CHIRPS/PENTAD | precipitation | 1 | ~5.5 km |
+| GPM IMERG | NASA/GPM_L3/IMERG_MONTHLY_V06 | precipitation | 1 | ~10 km |
+| AgERA5 | projects/climate-engine-pro/assets/ce-ag-era5-v2/daily | Precipitation_Flux | 1 | ~9 km |
 
 ## Exit Codes
 
