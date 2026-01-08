@@ -212,3 +212,4 @@ Examples/*
 !Examples/*.zip
 .DS_Store
 *.pdf
+javascripts/

@@ -29,16 +29,19 @@ pyCropWat/
 │   │   ├── cli.md
 │   │   ├── core.md
 │   │   └── utils.md
-│   └── user-guide/          # User guide
-│       ├── api.md
-│       ├── cli.md
-│       └── quickstart.md
+│   ├── user-guide/          # User guide
+│   │   ├── api.md
+│   │   ├── cli.md
+│   │   └── quickstart.md
 ├── Examples/                # Example outputs (see note below)
-│   ├── RDP_ERA5Land/        # ERA5-Land outputs for Rio de la Plata
-│   ├── RDP_ERA5Land.zip
-│   ├── RDP_TerraClimate/    # TerraClimate outputs for Rio de la Plata
-│   └── RDP_TerraClimate.zip
+│   ├── RDP_ERA5Land.zip     # ERA5-Land outputs for Rio de la Plata 
+│   └── RDP_TerraClimate.zip # TerraClimate outputs for Rio de la Plata
+├── .github/                 # GitHub configuration
+│   └── workflows/
+│       └── docs.yml         # GitHub Pages deployment workflow
+├── CHANGELOG.md             # Release notes
 ├── mkdocs.yml               # MkDocs configuration
+├── gee_cropwat.js           # Google Earth Engine JavaScript implementation
 ├── environment.yml          # Conda environment file
 ├── pyproject.toml           # Package configuration
 ├── requirements.txt         # pip dependencies
@@ -47,6 +50,8 @@ pyCropWat/
 ```
 
 **Note:** The `Examples/` folder contains sample output rasters generated from actual runs. These can be used as reference to verify your outputs or for testing visualization workflows. Currently, this folder has monthly TerraClimate and ERA5-Land-based effective precipitation and effective precipitation fraction TIF files (as zips; 2000-2025) for the Rio de la Plata (RDP) region of South America.
+
+**Changelog:** See [CHANGELOG.md](CHANGELOG.md) for release notes and version history.
 
 ## Overview
 
