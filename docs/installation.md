@@ -14,7 +14,7 @@ pip install pycropwat
 ## Install from source
 
 ```bash
-git clone https://github.com/sayantan-majumdar/pyCropWat.git
+git clone https://github.com/montimaj/pyCropWat.git
 cd pyCropWat
 pip install -e .
 ```

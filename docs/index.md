@@ -2,7 +2,7 @@
 
 **Calculate CROPWAT effective precipitation from Google Earth Engine climate data**
 
-[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://sayantan-majumdar.github.io/pyCropWat)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://montimaj.github.io/pyCropWat)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
@@ -54,7 +54,7 @@ pycropwat --asset ECMWF/ERA5_LAND/MONTHLY_AGGR \
 
 ## Documentation
 
-For full documentation, visit [https://sayantan-majumdar.github.io/pyCropWat](https://sayantan-majumdar.github.io/pyCropWat)
+For full documentation, visit [https://montimaj.github.io/pyCropWat](https://montimaj.github.io/pyCropWat)
 
 ## License
 
