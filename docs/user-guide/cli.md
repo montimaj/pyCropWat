@@ -139,14 +139,61 @@ pycropwat \
 
 ## Common GEE Assets
 
-| Dataset | Asset ID | Precipitation Band | Scale Factor | Resolution |
-|---------|----------|-------------------|--------------|------------|
-| ERA5-Land Monthly | "ECMWF/ERA5_LAND/MONTHLY_AGGR" | total_precipitation_sum | 1000 | ~11 km |
-| TerraClimate | "IDAHO_EPSCOR/TERRACLIMATE" | pr | 1 | ~4 km |
-| CHIRPS Daily | "UCSB-CHG/CHIRPS/DAILY" | precipitation | 1 | ~5.5 km |
-| CHIRPS Pentad | "UCSB-CHG/CHIRPS/PENTAD" | precipitation | 1 | ~5.5 km |
-| GPM IMERG | "NASA/GPM_L3/IMERG_MONTHLY_V06" | precipitation | 1 | ~10 km |
-| AgERA5 | "projects/climate-engine-pro/assets/ce-ag-era5-v2/daily" | Precipitation_Flux | 1 | ~9 km |
+<table>
+<thead>
+<tr>
+<th>Dataset</th>
+<th>Asset ID</th>
+<th>Precipitation Band</th>
+<th>Scale Factor</th>
+<th>Resolution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ERA5-Land Monthly</td>
+<td><code>ECMWF/ERA5_LAND/MONTHLY_AGGR</code></td>
+<td><code>total_precipitation_sum</code></td>
+<td>1000</td>
+<td>~11 km</td>
+</tr>
+<tr>
+<td>TerraClimate</td>
+<td><code>IDAHO_EPSCOR/TERRACLIMATE</code></td>
+<td><code>pr</code></td>
+<td>1</td>
+<td>~4 km</td>
+</tr>
+<tr>
+<td>CHIRPS Daily</td>
+<td><code>UCSB-CHG/CHIRPS/DAILY</code></td>
+<td><code>precipitation</code></td>
+<td>1</td>
+<td>~5.5 km</td>
+</tr>
+<tr>
+<td>CHIRPS Pentad</td>
+<td><code>UCSB-CHG/CHIRPS/PENTAD</code></td>
+<td><code>precipitation</code></td>
+<td>1</td>
+<td>~5.5 km</td>
+</tr>
+<tr>
+<td>GPM IMERG</td>
+<td><code>NASA/GPM_L3/IMERG_MONTHLY_V06</code></td>
+<td><code>precipitation</code></td>
+<td>1</td>
+<td>~10 km</td>
+</tr>
+<tr>
+<td>AgERA5</td>
+<td><code>projects/climate-engine-pro/assets/ce-ag-era5-v2/daily</code></td>
+<td><code>Precipitation_Flux</code></td>
+<td>1</td>
+<td>~9 km</td>
+</tr>
+</tbody>
+</table>
 
 ## Exit Codes
 
