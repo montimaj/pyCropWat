@@ -211,3 +211,5 @@ __marimo__/
 .DS_Store
 *.pdf
 javascripts/
+# Documentation symlinks (for local development)
+docs/assets/examples
