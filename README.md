@@ -1,6 +1,52 @@
 # pyCropWat
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://montimaj.github.io/pyCropWat)
+[![GEE](https://img.shields.io/badge/Google%20Earth%20Engine-4285F4?logo=google-earth&logoColor=white)](https://earthengine.google.com/)
+
 A Python package for calculating CROPWAT effective precipitation from Google Earth Engine climate data.
+
+## Project Structure
+
+```
+pyCropWat/
+├── pycropwat/               # Main package
+│   ├── __init__.py          # Package exports
+│   ├── core.py              # EffectivePrecipitation class
+│   ├── utils.py             # Utility functions (geometry loading, GEE init)
+│   └── cli.py               # Command-line interface
+├── tests/                   # Unit tests
+│   ├── __init__.py
+│   └── test_core.py
+├── docs/                    # MkDocs documentation
+│   ├── index.md             # Documentation home
+│   ├── installation.md      # Installation guide
+│   ├── examples.md          # Usage examples
+│   ├── contributing.md      # Contribution guidelines
+│   ├── api/                 # API reference
+│   │   ├── cli.md
+│   │   ├── core.md
+│   │   └── utils.md
+│   └── user-guide/          # User guide
+│       ├── api.md
+│       ├── cli.md
+│       └── quickstart.md
+├── Examples/                # Example outputs (see note below)
+│   ├── RDP_ERA5Land/        # ERA5-Land outputs for Rio de la Plata
+│   ├── RDP_ERA5Land.zip
+│   ├── RDP_TerraClimate/    # TerraClimate outputs for Rio de la Plata
+│   └── RDP_TerraClimate.zip
+├── gee_cropwat.js           # Original GEE JavaScript implementation
+├── mkdocs.yml               # MkDocs configuration
+├── environment.yml          # Conda environment file
+├── pyproject.toml           # Package configuration
+├── requirements.txt         # pip dependencies
+├── LICENSE
+└── README.md
+```
+
+**Note:** The `Examples/` folder contains sample output rasters generated from actual runs. These can be used as reference to verify your outputs or for testing visualization workflows. Currently, this folder has monthly TerraClimate and ERA5-Land-based effective precipitation and effective precipitation fraction TIF files (2000-2025) for the Rio de la Plata (RDP) region of South America.
 
 ## Overview
 
@@ -125,7 +171,7 @@ results = ep.process_sequential(output_dir='./output')
 ### Command Line Interface
 
 ```bash
-# Process ERA5-Land data with a GEE FeatureCollection asset (actual working example)
+# Process ERA5-Land data with a GEE FeatureCollection asset and output in 4 km resolution instead of the native 11 km resolution (actual working example)
 pycropwat --asset ECMWF/ERA5_LAND/MONTHLY_AGGR \
           --band total_precipitation_sum \
           --gee-geometry projects/ssebop-471916/assets/Riodelaplata \
@@ -133,16 +179,18 @@ pycropwat --asset ECMWF/ERA5_LAND/MONTHLY_AGGR \
           --end-year 2025 \
           --months 6 7 8 \
           --scale-factor 1000 \
+          --scale 4000 \
           --output ./Outputs
 
-# Process TerraClimate data with a GEE FeatureCollection asset (actual working example)
+# Process TerraClimate data with a GEE FeatureCollection asset and output in the native resolution (actual working example)
 # Note: TerraClimate precipitation is already in mm, so no scale-factor needed
 pycropwat --asset IDAHO_EPSCOR/TERRACLIMATE \
           --band pr \
           --gee-geometry projects/ssebop-471916/assets/Riodelaplata \
           --start-year 2000 \
           --end-year 2025 \
-          --output ./Outputs_TerraClimate
+          --workers 32 \
+          --output ./Examples/RDP_TerraClimate
 
 # Process ERA5-Land data with a local shapefile
 pycropwat --asset ECMWF/ERA5_LAND/MONTHLY_AGGR \
@@ -177,7 +225,7 @@ pycropwat --asset ECMWF/ERA5_LAND/MONTHLY_AGGR \
 | `--end-year` | `-e` | Yes | - | End year (inclusive) |
 | `--output` | `-o` | Yes | - | Output directory |
 | `--scale-factor` | `-f` | No | 1.0 | Conversion factor to mm |
-| `--scale` | `-r` | No | 11132 | Output resolution (meters) |
+| `--scale` | `-r` | No | Native | Output resolution in meters |
 | `--workers` | `-w` | No | 4 | Number of parallel workers |
 | `--months` | `-m` | No | All | Specific months to process |
 | `--project` | `-p` | No | None | GEE project ID |
@@ -193,6 +241,23 @@ The package generates two GeoTIFF files per month:
 1. `effective_precip_YYYY_MM.tif` - Effective precipitation (mm)
 2. `effective_precip_fraction_YYYY_MM.tif` - Effective precipitation fraction (0-1)
 
+### Output Resolution
+
+- **Default (no `--scale`):** Uses the native resolution of the input dataset
+  - ERA5-Land: ~11 km (0.1°)
+  - TerraClimate: ~4 km (1/24°)
+  - CHIRPS: ~5.5 km (0.05°)
+- **With `--scale`:** Reprojects to the specified resolution in meters (e.g., `--scale 1000` for 1 km)
+
+### Large Region Handling
+
+For large study areas or high-resolution outputs that exceed GEE's pixel limits, pyCropWat automatically:
+1. Splits the region into smaller tiles (max 512×512 pixels per tile)
+2. Downloads each tile separately
+3. Mosaics the tiles back together using `rioxarray`
+
+This is handled automatically with no additional dependencies required.
+
 ### Important: Units
 
 The CROPWAT formula is calibrated for precipitation in **millimeters (mm)**. The output effective precipitation is always in mm, provided you use the correct `--scale-factor` to convert input precipitation to mm first.
@@ -203,17 +268,27 @@ The formula constants (125, 250, 0.2, 0.1) are specifically designed for mm unit
 
 **Warning:** If you pass precipitation in wrong units (e.g., ERA5 in meters without `--scale-factor 1000`), the results will be incorrect because the 250mm threshold won't match properly.
 
+### Temporal Aggregation
+
+pyCropWat automatically **sums** all images within each month to compute monthly total precipitation, regardless of the input data's temporal resolution:
+
+- **Monthly data (ERA5, TerraClimate):** Uses the single monthly image directly
+- **Daily data (CHIRPS/DAILY):** Sums all ~30 daily images → monthly total
+- **Sub-daily data (GPM IMERG):** Sums all timesteps → monthly total
+
+This ensures the CROPWAT formula always receives the correct monthly precipitation totals.
+
 ## Common GEE Climate Assets
 
-| Asset ID | Precipitation Band | Scale Factor | Notes |
-|----------|-------------------|--------------|-------|
-| `ECMWF/ERA5_LAND/MONTHLY_AGGR` | `total_precipitation_sum` | 1000 | Monthly, meters to mm |
-| `ECMWF/ERA5/MONTHLY` | `total_precipitation` | 1000 | Monthly, meters to mm |
-| `IDAHO_EPSCOR/TERRACLIMATE` | `pr` | 1 | Monthly, already in mm |
-| `UCSB-CHG/CHIRPS/DAILY` | `precipitation` | 1 | Daily, already in mm |
-| `UCSB-CHG/CHIRPS/PENTAD` | `precipitation` | 1 | 5-day, already in mm |
-| `NASA/GPM_L3/IMERG_V06` | `precipitation` | 1 | Half-hourly, mm/hr |
-
+| Asset ID | Precipitation Band | Scale Factor | Spatial Resolution | Temporal Resolution |
+|----------|-------------------|--------------|-------------------|---------------------|
+| `ECMWF/ERA5_LAND/MONTHLY_AGGR` | `total_precipitation_sum` | 1000 | ~11 km (0.1°) | Monthly |
+| `ECMWF/ERA5/MONTHLY` | `total_precipitation` | 1000 | ~27 km (0.25°) | Monthly |
+| `IDAHO_EPSCOR/TERRACLIMATE` | `pr` | 1 | ~4 km (1/24°) | Monthly |
+| `UCSB-CHG/CHIRPS/DAILY` | `precipitation` | 1 | ~5.5 km (0.05°) | Daily |
+| `UCSB-CHG/CHIRPS/PENTAD` | `precipitation` | 1 | ~5.5 km (0.05°) | 5-day (Pentad) |
+| `NASA/GPM_L3/IMERG_V06` | `precipitation` | 1 | ~11 km (0.1°) | Half-hourly |
+| `projects/climate-engine-pro/assets/ce-ag-era5-v2/daily` | `Precipitation_Flux` | 1 | ~9 km (0.1°) | Daily |
 ## Google Earth Engine Authentication
 
 Before using pyCropWat, authenticate with Google Earth Engine:
@@ -229,4 +304,35 @@ import ee
 ee.Authenticate()
 ee.Initialize(project='your-project-id')
 ```
-Python and Google Earth Engine Python API-based implementation of FAO CropWat
+
+## Citation
+
+If you use pyCropWat in your research, please cite:
+
+```bibtex
+@software{pycropwat,
+  author = {Majumdar, Sayantan and ReVelle, Peter and Nozari, Soheil and Huntington, Justin and Smith, Ryan},
+  title = {pyCropWat: Python implementation of FAO CROPWAT effective precipitation using Google Earth Engine},
+  year = {2026},
+  url = {https://github.com/montimaj/pyCropWat}
+}
+```
+
+## Funding
+
+This work was supported by a U.S. Army Corps of Engineers grant for the project *"Improved Characterization of Groundwater Resources in Transboundary Watersheds using Satellite Data and Integrated Models."*
+
+**Principal Investigator:** Dr. Ryan Smith (Colorado State University)
+
+**Co-Principal Investigators:**
+- Dr. Ryan Bailey (Colorado State University)
+- Dr. Justin Huntington (Desert Research Institute)
+- Dr. Sayantan Majumdar (Desert Research Institute)
+- Mr. Peter ReVelle (Desert Research Institute)
+
+**Research Scientist:**
+- Dr. Soheil Nozari (Colorado State University)
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

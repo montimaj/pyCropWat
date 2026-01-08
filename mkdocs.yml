@@ -1,0 +1,77 @@
+site_name: pyCropWat
+site_description: Calculate CROPWAT effective precipitation from Google Earth Engine climate data
+site_author: Sayantan Majumdar
+site_url: https://montimaj.github.io/pyCropWat
+
+repo_name: montimaj/pyCropWat
+repo_url: https://github.com/montimaj/pyCropWat
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            docstring_style: numpy
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - User Guide:
+    - Quick Start: user-guide/quickstart.md
+    - CLI Reference: user-guide/cli.md
+    - Python API: user-guide/api.md
+  - API Reference:
+    - Core: api/core.md
+    - Utilities: api/utils.md
+    - CLI: api/cli.md
+  - Examples: examples.md
+  - Contributing: contributing.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/montimaj/pyCropWat

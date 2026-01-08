@@ -104,8 +104,8 @@ Examples:
     parser.add_argument(
         '--scale', '-r',
         type=float,
-        default=11132,
-        help='Output resolution in meters (default: 11132, ~0.1 degree)'
+        default=None,
+        help='Output resolution in meters. If not specified, uses native resolution of input data.'
     )
     
     parser.add_argument(

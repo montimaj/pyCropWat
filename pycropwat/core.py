@@ -3,12 +3,14 @@ Core module for effective precipitation calculations using Google Earth Engine.
 """
 
 import logging
+import tempfile
 from pathlib import Path
 from typing import Union, Optional, List, Tuple
 import ee
 import numpy as np
 import xarray as xr
 import rioxarray
+from rioxarray.merge import merge_arrays
 import dask
 from dask import delayed, compute
 from dask.diagnostics import ProgressBar
@@ -16,6 +18,9 @@ from dask.diagnostics import ProgressBar
 from .utils import load_geometry, get_date_range, get_monthly_dates, initialize_gee
 
 logger = logging.getLogger(__name__)
+
+# Maximum pixels per tile for GEE sampleRectangle (conservative limit)
+MAX_PIXELS_PER_TILE = 65536  # 256 x 256
 
 
 class EffectivePrecipitation:
@@ -41,7 +46,7 @@ class EffectivePrecipitation:
     end_year : int
         End year for processing (inclusive).
     scale : float, optional
-        Output resolution in meters. Default is 11132 (~0.1 degree).
+        Output resolution in meters. Default is native resolution (None).
     precip_scale_factor : float, optional
         Factor to convert precipitation to mm. Default is 1000 (for ERA5 m to mm).
     gee_project : str, optional
@@ -82,7 +87,7 @@ class EffectivePrecipitation:
         geometry_path: Optional[Union[str, Path]] = None,
         start_year: int = None,
         end_year: int = None,
-        scale: float = 11132,
+        scale: Optional[float] = None,
         precip_scale_factor: float = 1.0,
         gee_project: Optional[str] = None,
         gee_geometry_asset: Optional[str] = None,
@@ -93,7 +98,7 @@ class EffectivePrecipitation:
         self.gee_geometry_asset = gee_geometry_asset
         self.start_year = start_year
         self.end_year = end_year
-        self.scale = scale
+        self.scale = scale  # None means use native resolution
         self.precip_scale_factor = precip_scale_factor
         self.gee_project = gee_project
         
@@ -155,6 +160,211 @@ class EffectivePrecipitation:
         )
         return ep
     
+    def _get_native_scale(self) -> float:
+        """
+        Get the native scale (resolution) of the image collection in meters.
+        
+        Returns
+        -------
+        float
+            Native scale in meters.
+        """
+        try:
+            # Get the first image from the collection to determine native scale
+            first_img = self.collection.first()
+            projection = first_img.projection()
+            native_scale = projection.nominalScale().getInfo()
+            logger.info(f"Native scale: {native_scale} meters")
+            return native_scale
+        except Exception as e:
+            logger.warning(f"Could not determine native scale, defaulting to 10000m: {e}")
+            return 10000.0
+    
+    def _estimate_pixel_count(self, bounds_coords: List, scale_meters: float) -> int:
+        """
+        Estimate the number of pixels for a given bounds and scale.
+        
+        Parameters
+        ----------
+        bounds_coords : list
+            Bounding box coordinates [[min_lon, min_lat], [max_lon, min_lat], ...]
+        scale_meters : float
+            Resolution in meters.
+            
+        Returns
+        -------
+        int
+            Estimated number of pixels.
+        """
+        min_lon = min(c[0] for c in bounds_coords)
+        max_lon = max(c[0] for c in bounds_coords)
+        min_lat = min(c[1] for c in bounds_coords)
+        max_lat = max(c[1] for c in bounds_coords)
+        
+        # Approximate width and height in meters (at mid-latitude)
+        mid_lat = (min_lat + max_lat) / 2
+        lat_meters_per_degree = 111320  # meters per degree latitude
+        lon_meters_per_degree = 111320 * np.cos(np.radians(mid_lat))
+        
+        width_meters = (max_lon - min_lon) * lon_meters_per_degree
+        height_meters = (max_lat - min_lat) * lat_meters_per_degree
+        
+        n_cols = int(np.ceil(width_meters / scale_meters))
+        n_rows = int(np.ceil(height_meters / scale_meters))
+        
+        return n_cols * n_rows
+    
+    def _create_tile_grid(self, bounds_coords: List, scale_meters: float) -> List[ee.Geometry]:
+        """
+        Create a grid of tiles that cover the bounding box.
+        
+        Parameters
+        ----------
+        bounds_coords : list
+            Bounding box coordinates.
+        scale_meters : float
+            Resolution in meters.
+            
+        Returns
+        -------
+        list
+            List of ee.Geometry.Rectangle tiles.
+        """
+        min_lon = min(c[0] for c in bounds_coords)
+        max_lon = max(c[0] for c in bounds_coords)
+        min_lat = min(c[1] for c in bounds_coords)
+        max_lat = max(c[1] for c in bounds_coords)
+        
+        # Calculate tile size in degrees based on MAX_PIXELS_PER_TILE
+        tile_pixels = int(np.sqrt(MAX_PIXELS_PER_TILE))  # e.g., 512 pixels per side
+        
+        mid_lat = (min_lat + max_lat) / 2
+        lat_meters_per_degree = 111320
+        lon_meters_per_degree = 111320 * np.cos(np.radians(mid_lat))
+        
+        # Tile size in degrees
+        tile_height_deg = (tile_pixels * scale_meters) / lat_meters_per_degree
+        tile_width_deg = (tile_pixels * scale_meters) / lon_meters_per_degree
+        
+        tiles = []
+        lat = min_lat
+        while lat < max_lat:
+            lon = min_lon
+            while lon < max_lon:
+                tile_max_lat = min(lat + tile_height_deg, max_lat)
+                tile_max_lon = min(lon + tile_width_deg, max_lon)
+                
+                tile = ee.Geometry.Rectangle([lon, lat, tile_max_lon, tile_max_lat])
+                tiles.append(tile)
+                
+                lon += tile_width_deg
+            lat += tile_height_deg
+        
+        logger.info(f"Created {len(tiles)} tiles for download")
+        return tiles
+    
+    def _download_tile(
+        self,
+        img: ee.Image,
+        tile: ee.Geometry,
+        default_value: float = 0
+    ) -> Optional[Tuple[np.ndarray, List]]:
+        """
+        Download a single tile from GEE.
+        
+        Parameters
+        ----------
+        img : ee.Image
+            Image to download.
+        tile : ee.Geometry
+            Tile geometry.
+        default_value : float
+            Default value for missing data.
+            
+        Returns
+        -------
+        tuple or None
+            Tuple of (array, coordinates) or None if download fails.
+        """
+        try:
+            arr = img.sampleRectangle(
+                region=tile,
+                defaultValue=default_value
+            ).get('pr').getInfo()
+            
+            if arr is None:
+                return None
+            
+            arr = np.array(arr, dtype=np.float32)
+            coords = tile.getInfo()['coordinates'][0]
+            
+            return arr, coords
+            
+        except Exception as e:
+            logger.warning(f"Failed to download tile: {e}")
+            return None
+    
+    def _mosaic_tiles(
+        self,
+        tile_files: List[Path],
+        output_path: Path,
+        cleanup: bool = True
+    ) -> bool:
+        """
+        Mosaic tile files using rioxarray.
+        
+        Parameters
+        ----------
+        tile_files : list
+            List of tile file paths.
+        output_path : Path
+            Output mosaic file path.
+        cleanup : bool
+            Whether to delete tile files after mosaicking.
+            
+        Returns
+        -------
+        bool
+            True if successful, False otherwise.
+        """
+        if len(tile_files) == 0:
+            return False
+        
+        if len(tile_files) == 1:
+            # Just copy the single tile
+            import shutil
+            shutil.copy(tile_files[0], output_path)
+            if cleanup:
+                tile_files[0].unlink()
+            return True
+        
+        try:
+            # Read all tiles as DataArrays
+            tile_arrays = []
+            for f in tile_files:
+                da = rioxarray.open_rasterio(f).squeeze('band', drop=True)
+                tile_arrays.append(da)
+            
+            # Merge tiles using rioxarray
+            merged = merge_arrays(tile_arrays)
+            
+            # Save merged result
+            merged.rio.to_raster(output_path, compress='LZW')
+            
+            # Close arrays and cleanup
+            for da in tile_arrays:
+                da.close()
+            
+            if cleanup:
+                for f in tile_files:
+                    f.unlink()
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Mosaicking failed: {e}")
+            return False
+    
     def _get_monthly_image(self, year: int, month: int) -> ee.Image:
         """
         Get a single monthly image from the collection.
@@ -169,19 +379,19 @@ class EffectivePrecipitation:
         Returns
         -------
         ee.Image
-            Monthly precipitation image.
+            Monthly precipitation image (sum of all images in that month).
         """
         monthly_img = (
             self.collection
             .filter(ee.Filter.calendarRange(year, year, 'year'))
             .filter(ee.Filter.calendarRange(month, month, 'month'))
-            .mean()  # In case there are multiple images
+            .sum()  # Sum all images to get monthly total precipitation
         )
         return monthly_img.clip(self.geometry)
     
-    def _download_monthly_precip(self, year: int, month: int) -> Optional[xr.DataArray]:
+    def _download_monthly_precip(self, year: int, month: int, temp_dir: Optional[Path] = None) -> Optional[xr.DataArray]:
         """
-        Download monthly precipitation data from GEE.
+        Download monthly precipitation data from GEE, using chunked download if needed.
         
         Parameters
         ----------
@@ -189,6 +399,8 @@ class EffectivePrecipitation:
             Year.
         month : int
             Month (1-12).
+        temp_dir : Path, optional
+            Temporary directory for tile files. If None, uses system temp.
             
         Returns
         -------
@@ -197,56 +409,202 @@ class EffectivePrecipitation:
         """
         try:
             img = self._get_monthly_image(year, month)
-            
-            # Get the image as a numpy array
-            # Using getDownloadURL with numpy format
             region = self.geometry.bounds()
+            bounds_coords = region.getInfo()['coordinates'][0]
             
-            # Sample the image at the specified scale
-            arr = img.sampleRectangle(
-                region=region,
-                defaultValue=0
-            ).get('pr').getInfo()
+            # Determine the scale to use (native or specified)
+            if self.scale is not None:
+                scale_meters = self.scale
+            else:
+                # Use native scale from the dataset
+                scale_meters = self._get_native_scale()
             
-            if arr is None:
-                logger.warning(f"No data for {year}-{month:02d}")
-                return None
-            
-            arr = np.array(arr, dtype=np.float32)
-            
-            # Get coordinates
-            coords = region.getInfo()['coordinates'][0]
-            min_lon = min(c[0] for c in coords)
-            max_lon = max(c[0] for c in coords)
-            min_lat = min(c[1] for c in coords)
-            max_lat = max(c[1] for c in coords)
-            
-            # Create coordinate arrays
-            lats = np.linspace(max_lat, min_lat, arr.shape[0])
-            lons = np.linspace(min_lon, max_lon, arr.shape[1])
-            
-            # Create xarray DataArray
-            da = xr.DataArray(
-                arr,
-                dims=['y', 'x'],
-                coords={
-                    'y': lats,
-                    'x': lons
-                },
-                attrs={
-                    'units': 'mm',
-                    'long_name': 'precipitation',
-                    'year': year,
-                    'month': month
-                }
+            # Always reproject to ensure consistent resolution
+            img = img.reproject(
+                crs='EPSG:4326',
+                scale=scale_meters
             )
-            da = da.rio.write_crs("EPSG:4326")
             
-            return da
+            # Estimate pixel count
+            estimated_pixels = self._estimate_pixel_count(bounds_coords, scale_meters)
+            logger.debug(f"Estimated pixels: {estimated_pixels}, max allowed: {MAX_PIXELS_PER_TILE}")
+            
+            # Check if we need chunked download
+            if estimated_pixels <= MAX_PIXELS_PER_TILE:
+                # Direct download (small region)
+                return self._download_single_tile(img, region, year, month)
+            else:
+                # Chunked download (large region)
+                logger.info(f"Large region detected ({estimated_pixels} pixels), using chunked download...")
+                return self._download_chunked(img, bounds_coords, scale_meters, year, month, temp_dir)
             
         except Exception as e:
             logger.error(f"Error downloading data for {year}-{month:02d}: {e}")
             return None
+    
+    def _download_single_tile(
+        self,
+        img: ee.Image,
+        region: ee.Geometry,
+        year: int,
+        month: int
+    ) -> Optional[xr.DataArray]:
+        """
+        Download a single tile directly (for small regions).
+        """
+        arr = img.sampleRectangle(
+            region=region,
+            defaultValue=0
+        ).get('pr').getInfo()
+        
+        if arr is None:
+            logger.warning(f"No data for {year}-{month:02d}")
+            return None
+        
+        arr = np.array(arr, dtype=np.float32)
+        
+        # Get coordinates
+        coords = region.getInfo()['coordinates'][0]
+        min_lon = min(c[0] for c in coords)
+        max_lon = max(c[0] for c in coords)
+        min_lat = min(c[1] for c in coords)
+        max_lat = max(c[1] for c in coords)
+        
+        # Create coordinate arrays
+        lats = np.linspace(max_lat, min_lat, arr.shape[0])
+        lons = np.linspace(min_lon, max_lon, arr.shape[1])
+        
+        # Create xarray DataArray
+        da = xr.DataArray(
+            arr,
+            dims=['y', 'x'],
+            coords={
+                'y': lats,
+                'x': lons
+            },
+            attrs={
+                'units': 'mm',
+                'long_name': 'precipitation',
+                'year': year,
+                'month': month
+            }
+        )
+        da = da.rio.write_crs("EPSG:4326")
+        
+        return da
+    
+    def _download_chunked(
+        self,
+        img: ee.Image,
+        bounds_coords: List,
+        scale_meters: float,
+        year: int,
+        month: int,
+        temp_dir: Optional[Path] = None
+    ) -> Optional[xr.DataArray]:
+        """
+        Download image in chunks and mosaic together.
+        
+        Parameters
+        ----------
+        img : ee.Image
+            Image to download.
+        bounds_coords : list
+            Bounding box coordinates.
+        scale_meters : float
+            Resolution in meters.
+        year : int
+            Year.
+        month : int
+            Month.
+        temp_dir : Path, optional
+            Temporary directory for tiles.
+            
+        Returns
+        -------
+        xr.DataArray or None
+            Mosaicked data array.
+        """
+        # Create tiles
+        tiles = self._create_tile_grid(bounds_coords, scale_meters)
+        
+        # Create temp directory for tiles
+        if temp_dir is None:
+            temp_dir = Path(tempfile.mkdtemp(prefix='pycropwat_'))
+        else:
+            temp_dir.mkdir(parents=True, exist_ok=True)
+        
+        tile_files = []
+        
+        try:
+            # Download each tile
+            for i, tile in enumerate(tiles):
+                logger.debug(f"Downloading tile {i+1}/{len(tiles)}")
+                result = self._download_tile(img, tile)
+                
+                if result is None:
+                    continue
+                
+                arr, coords = result
+                
+                # Get tile bounds
+                min_lon = min(c[0] for c in coords)
+                max_lon = max(c[0] for c in coords)
+                min_lat = min(c[1] for c in coords)
+                max_lat = max(c[1] for c in coords)
+                
+                # Create coordinate arrays for this tile
+                lats = np.linspace(max_lat, min_lat, arr.shape[0])
+                lons = np.linspace(min_lon, max_lon, arr.shape[1])
+                
+                # Create DataArray for this tile
+                tile_da = xr.DataArray(
+                    arr,
+                    dims=['y', 'x'],
+                    coords={'y': lats, 'x': lons},
+                    attrs={'units': 'mm', 'long_name': 'precipitation'}
+                )
+                tile_da = tile_da.rio.write_crs("EPSG:4326")
+                
+                # Save tile to temp file
+                tile_path = temp_dir / f"tile_{i:04d}.tif"
+                tile_da.rio.to_raster(tile_path)
+                tile_files.append(tile_path)
+            
+            if not tile_files:
+                logger.warning(f"No tiles downloaded for {year}-{month:02d}")
+                return None
+            
+            # Mosaic tiles
+            mosaic_path = temp_dir / f"mosaic_{year}_{month:02d}.tif"
+            success = self._mosaic_tiles(tile_files, mosaic_path, cleanup=True)
+            
+            if not success:
+                logger.error("Failed to mosaic tiles")
+                return None
+            
+            # Read mosaicked file
+            da = rioxarray.open_rasterio(mosaic_path).squeeze('band', drop=True)
+            da.attrs = {
+                'units': 'mm',
+                'long_name': 'precipitation',
+                'year': year,
+                'month': month
+            }
+            
+            # Load into memory and cleanup
+            da = da.load()
+            mosaic_path.unlink()
+            
+            return da
+            
+        finally:
+            # Cleanup temp directory if empty
+            try:
+                if temp_dir.exists() and not any(temp_dir.iterdir()):
+                    temp_dir.rmdir()
+            except Exception:
+                pass
     
     def _process_single_month(
         self,
