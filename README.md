@@ -346,6 +346,54 @@ This work was supported by a U.S. Army Corps of Engineers grant (W912HZ25C0016) 
 **Research Scientist:**
 - Dr. Soheil Nozari (Colorado State University)
 
+## Roadmap
+
+The following features are under consideration for future releases:
+
+### 📊 Temporal Aggregation
+- Seasonal summaries (DJF, MAM, JJA, SON)
+- Annual totals with statistics
+- Growing season aggregations based on crop calendars
+- Custom date range aggregations
+
+### 🌾 Crop Water Requirements
+- Crop coefficient (Kc) integration for different crop types/stages
+- Net irrigation requirement (ETc - Peff) calculations
+- Crop calendar support for region-specific growing seasons
+
+### 📈 Statistical Analysis
+- Long-term climatology (e.g., 30-year normals)
+- Anomaly detection (departure from normal)
+- Trend analysis using Mann-Kendall or Sen's slope
+- Drought indices (SPI, SPEI) integration
+
+### 🔄 Additional Effective Precipitation Methods
+- FAO/AGLW method
+- Fixed percentage method (e.g., 70-80% of rainfall)
+- Dependable rainfall (FAO method at different probability levels)
+
+### 📤 Enhanced Export Options
+- NetCDF output for time-series analysis
+- Cloud-Optimized GeoTIFFs (COGs)
+- Zonal statistics CSV export by polygon
+- Direct cloud storage export (GCS, S3)
+
+### 📉 Visualization
+- Built-in plotting functions for time series
+- Interactive maps (folium/leafmap integration)
+- Comparison plots between datasets
+
+### ✅ Validation Tools
+- Station data comparison module
+- Cross-dataset validation (e.g., ERA5 vs TerraClimate)
+- Uncertainty quantification
+
+### 💧 Water Balance Extension
+- Evapotranspiration integration (from MODIS, SSEBop, OpenET)
+- Simple water balance (P - ET - Runoff)
+
+**Have a feature request?** Please submit your ideas via [GitHub Issues](https://github.com/montimaj/pyCropWat/issues). We welcome community contributions and feedback!
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
