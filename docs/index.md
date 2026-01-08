@@ -18,7 +18,7 @@ pyCropWat is a Python package that calculates effective precipitation using the 
 
 ## CROPWAT Formula
 
-The effective precipitation is calculated using the USDA SCS / FAO CROPWAT formula:
+The effective precipitation is calculated using the USDA SCS method as implemented in FAO CROPWAT ([Smith, 1992](https://www.fao.org/sustainable-development-goals-helpdesk/champion/article-detail/cropwat/en); [Muratoglu et al., 2023](https://doi.org/10.1016/j.watres.2023.120011)):
 
 $$
 P_{eff} = \begin{cases}

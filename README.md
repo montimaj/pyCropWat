@@ -58,8 +58,10 @@ pyCropWat converts precipitation data from any GEE climate dataset into effectiv
 
 ### CROPWAT Effective Precipitation Formula
 
-- If precipitation ≤ 250mm: `Peff = P × (125 - 0.2 × P) / 125`
-- If precipitation > 250mm: `Peff = 0.1 × P + 125`
+The effective precipitation is calculated using the USDA SCS method as implemented in FAO CROPWAT (Smith, 1992; Muratoglu et al., 2023):
+
+- If precipitation ≤ 250 mm: `Peff = P × (125 - 0.2 × P) / 125`
+- If precipitation > 250 mm: `Peff = 0.1 × P + 125`
 
 ## Installation
 
@@ -316,6 +318,13 @@ If you use pyCropWat in your research, please cite:
   url = {https://github.com/montimaj/pyCropWat}
 }
 ```
+
+### Effective Precipitation Method References
+
+- Muratoglu, A., Bilgen, G. K., Angin, I., & Kodal, S. (2023). Performance analyses of effective rainfall estimation methods for accurate quantification of agricultural water footprint. *Water Research*, *238*, 120011. https://doi.org/10.1016/j.watres.2023.120011
+
+- Smith, M. (1992). *CROPWAT: A computer program for irrigation planning and management* (FAO Irrigation and Drainage Paper No. 46). Food and Agriculture Organization of the United Nations. https://www.fao.org/sustainable-development-goals-helpdesk/champion/article-detail/cropwat/en
+
 
 ## Funding
 
