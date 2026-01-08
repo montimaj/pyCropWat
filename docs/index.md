@@ -56,6 +56,23 @@ pycropwat --asset ECMWF/ERA5_LAND/MONTHLY_AGGR \
 
 For full documentation, visit [https://montimaj.github.io/pyCropWat](https://montimaj.github.io/pyCropWat)
 
+## Funding
+
+This work was supported by a U.S. Army Corps of Engineers grant (W912HZ25C0016) for the project *"Improved Characterization of Groundwater Resources in Transboundary Watersheds using Satellite Data and Integrated Models."*
+
+**Principal Investigator:** Dr. Ryan Smith (Colorado State University)
+
+**Co-Principal Investigators:**
+
+- Dr. Ryan Bailey (Colorado State University)
+- Dr. Justin Huntington (Desert Research Institute)
+- Dr. Sayantan Majumdar (Desert Research Institute)
+- Mr. Peter ReVelle (Desert Research Institute)
+
+**Research Scientist:**
+
+- Dr. Soheil Nozari (Colorado State University)
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.

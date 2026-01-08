@@ -328,7 +328,7 @@ If you use pyCropWat in your research, please cite:
 
 ## Funding
 
-This work was supported by a U.S. Army Corps of Engineers grant for the project *"Improved Characterization of Groundwater Resources in Transboundary Watersheds using Satellite Data and Integrated Models."*
+This work was supported by a U.S. Army Corps of Engineers grant (W912HZ25C0016) for the project *"Improved Characterization of Groundwater Resources in Transboundary Watersheds using Satellite Data and Integrated Models."*
 
 **Principal Investigator:** Dr. Ryan Smith (Colorado State University)
 
