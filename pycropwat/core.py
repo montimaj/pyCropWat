@@ -236,7 +236,7 @@ class EffectivePrecipitation:
         max_lat = max(c[1] for c in bounds_coords)
         
         # Calculate tile size in degrees based on MAX_PIXELS_PER_TILE
-        tile_pixels = int(np.sqrt(MAX_PIXELS_PER_TILE))  # e.g., 512 pixels per side
+        tile_pixels = int(np.sqrt(MAX_PIXELS_PER_TILE))  # e.g., 256 pixels per side
         
         mid_lat = (min_lat + max_lat) / 2
         lat_meters_per_degree = 111320

@@ -251,7 +251,7 @@ The package generates two GeoTIFF files per month:
 ### Large Region Handling
 
 For large study areas or high-resolution outputs that exceed GEE's pixel limits, pyCropWat automatically:
-1. Splits the region into smaller tiles (max 512×512 pixels per tile)
+1. Splits the region into smaller tiles (max 256×256 pixels per tile)
 2. Downloads each tile separately
 3. Mosaics the tiles back together using `rioxarray`
 
