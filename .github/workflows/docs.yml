@@ -35,11 +35,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install mkdocs mkdocs-material mkdocstrings[python] mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index
 
-      - name: Copy example outputs for documentation
-        run: |
-          mkdir -p docs/assets/examples
-          cp -r Examples/analysis_outputs/* docs/assets/examples/
-
       - name: Build documentation
         run: mkdocs build
 
