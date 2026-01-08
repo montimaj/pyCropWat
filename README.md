@@ -37,7 +37,6 @@ pyCropWat/
 │   ├── RDP_ERA5Land.zip
 │   ├── RDP_TerraClimate/    # TerraClimate outputs for Rio de la Plata
 │   └── RDP_TerraClimate.zip
-├── gee_cropwat.js           # Original GEE JavaScript implementation
 ├── mkdocs.yml               # MkDocs configuration
 ├── environment.yml          # Conda environment file
 ├── pyproject.toml           # Package configuration
@@ -46,7 +45,7 @@ pyCropWat/
 └── README.md
 ```
 
-**Note:** The `Examples/` folder contains sample output rasters generated from actual runs. These can be used as reference to verify your outputs or for testing visualization workflows. Currently, this folder has monthly TerraClimate and ERA5-Land-based effective precipitation and effective precipitation fraction TIF files (2000-2025) for the Rio de la Plata (RDP) region of South America.
+**Note:** The `Examples/` folder contains sample output rasters generated from actual runs. These can be used as reference to verify your outputs or for testing visualization workflows. Currently, this folder has monthly TerraClimate and ERA5-Land-based effective precipitation and effective precipitation fraction TIF files (as zips; 2000-2025) for the Rio de la Plata (RDP) region of South America.
 
 ## Overview
 
