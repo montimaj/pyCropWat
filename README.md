@@ -41,7 +41,6 @@ pyCropWat/
 │       └── docs.yml         # GitHub Pages deployment workflow
 ├── CHANGELOG.md             # Release notes
 ├── mkdocs.yml               # MkDocs configuration
-├── gee_cropwat.js           # Google Earth Engine JavaScript implementation
 ├── environment.yml          # Conda environment file
 ├── pyproject.toml           # Package configuration
 ├── requirements.txt         # pip dependencies
