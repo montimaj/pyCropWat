@@ -11,7 +11,7 @@ license = {text = "MIT"}
 authors = [
     {name = "Sayantan Majumdar", email = "sayantan.majumdar@dri.edu"},
     {name = "Peter ReVelle", email = "peter.revelle@dri.edu"},
-    {name = "Soheil Nozari", email = "soheil.nozari@colostate.edu"}
+    {name = "Soheil Nozari", email = "soheil.nozari@colostate.edu"},
     {name = "Justin Huntington", email = "justin.huntington@dri.edu"},
     {name = "Ryan Smith", email = "ryan.smith@colostate.edu"}   
 ]
