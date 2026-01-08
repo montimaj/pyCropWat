@@ -210,7 +210,7 @@ export_to_netcdf(
     input_dir='./outputs',
     output_path='./data.nc',
     variable='effective_precip',
-    pattern='effective_precip_*.tif',
+    pattern='effective_precip_[0-9]*.tif',  # Excludes fraction files
     compression=True
 )
 
@@ -220,9 +220,9 @@ export_to_cog(
     output_path='./cog_2020_06.tif'
 )
 
-# Batch convert to COGs
+# Batch convert to COGs (excludes fraction files)
 from pathlib import Path
-for tif in Path('./outputs').glob('effective_precip_*.tif'):
+for tif in Path('./outputs').glob('effective_precip_[0-9]*.tif'):
     export_to_cog(str(tif), f'./cogs/{tif.name}')
 ```
 

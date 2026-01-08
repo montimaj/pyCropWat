@@ -372,15 +372,15 @@ export_to_netcdf(
     input_dir='./outputs',
     output_path='./effective_precip.nc',
     variable='effective_precip',
-    pattern='effective_precip_*.tif',
+    pattern='effective_precip_[0-9]*.tif',  # Excludes fraction files
     compression=True
 )
 
-# Batch convert to Cloud-Optimized GeoTIFFs
+# Batch convert to Cloud-Optimized GeoTIFFs (excludes fraction files)
 output_cog_dir = Path('./cogs')
 output_cog_dir.mkdir(exist_ok=True)
 
-for tif in Path('./outputs').glob('effective_precip_*.tif'):
+for tif in Path('./outputs').glob('effective_precip_[0-9]*.tif'):
     export_to_cog(
         input_path=str(tif),
         output_path=str(output_cog_dir / tif.name)
@@ -398,9 +398,9 @@ pycropwat export cog \
     --input ./outputs/effective_precip_2020_06.tif \
     --output ./cogs/effective_precip_2020_06.tif
 
-# Batch convert with shell loop
+# Batch convert with shell loop (excludes fraction files)
 mkdir -p ./cogs
-for f in ./outputs/effective_precip_*.tif; do
+for f in ./outputs/effective_precip_[0-9]*.tif; do
     pycropwat export cog --input "$f" --output "./cogs/$(basename $f)"
 done
 ```

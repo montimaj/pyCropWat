@@ -149,7 +149,7 @@ pycropwat aggregate [OPTIONS]
 | `--end-month` | Growing season end month (default: 10) |
 | `--months`, `-m` | Specific months for custom aggregation |
 | `--method` | Aggregation method: sum, mean, min, max, std (default: sum) |
-| `--pattern` | File glob pattern (default: effective_precip_*.tif) |
+| `--pattern` | File glob pattern (default: effective_precip_[0-9]*.tif, excludes fraction files) |
 
 ### Examples
 
@@ -255,7 +255,7 @@ pycropwat export netcdf --input ./output --output ./data.nc
 |--------|-------------|
 | `--input`, `-i` | Input directory (required) |
 | `--output`, `-o` | Output NetCDF file (required) |
-| `--pattern` | File glob pattern (default: effective_precip_*.tif) |
+| `--pattern` | File glob pattern (default: effective_precip_[0-9]*.tif, excludes fraction files) |
 | `--variable` | Variable name in NetCDF |
 | `--no-compression` | Disable compression |
 

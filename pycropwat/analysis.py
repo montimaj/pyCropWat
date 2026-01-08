@@ -43,7 +43,9 @@ class TemporalAggregator:
     input_dir : str or Path
         Directory containing monthly effective precipitation rasters.
     pattern : str, optional
-        Glob pattern for finding input files. Default is 'effective_precip_*.tif'.
+        Glob pattern for finding input files. Default is 'effective_precip_[0-9]*.tif'
+        which excludes fraction files. Use 'effective_precip_fraction_*.tif' to work
+        with fraction files instead.
         
     Examples
     --------
@@ -63,7 +65,7 @@ class TemporalAggregator:
     def __init__(
         self,
         input_dir: Union[str, Path],
-        pattern: str = 'effective_precip_*.tif'
+        pattern: str = 'effective_precip_[0-9]*.tif'
     ):
         self.input_dir = Path(input_dir)
         self.pattern = pattern
@@ -431,7 +433,7 @@ class StatisticalAnalyzer:
     def __init__(
         self,
         input_dir: Union[str, Path],
-        pattern: str = 'effective_precip_*.tif'
+        pattern: str = 'effective_precip_[0-9]*.tif'
     ):
         self.aggregator = TemporalAggregator(input_dir, pattern)
         self.input_dir = Path(input_dir)
@@ -812,7 +814,7 @@ class Visualizer:
     def __init__(
         self,
         input_dir: Union[str, Path],
-        pattern: str = 'effective_precip_*.tif'
+        pattern: str = 'effective_precip_[0-9]*.tif'
     ):
         self.input_dir = Path(input_dir)
         self.aggregator = TemporalAggregator(input_dir, pattern)
