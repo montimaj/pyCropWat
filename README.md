@@ -27,6 +27,8 @@ pyCropWat/
 │   ├── installation.md      # Installation guide
 │   ├── examples.md          # Usage examples
 │   ├── contributing.md      # Contribution guidelines
+│   ├── assets/              # Documentation assets
+│   │   └── examples/        # Example output images for docs
 │   ├── api/                 # API reference
 │   │   ├── cli.md
 │   │   ├── core.md
@@ -38,9 +40,18 @@ pyCropWat/
 ├── Examples/                # Example outputs and scripts
 │   ├── README.md               # Detailed workflow documentation
 │   ├── complete_workflow_example.py  # Complete workflow script
-│   ├── RDP_ERA5Land           # ERA5-Land outputs for Rio de la Plata
-│   ├── RDP_TerraClimate      # TerraClimate outputs for Rio de la Plata
+│   ├── RDP_ERA5Land/          # ERA5-Land outputs for Rio de la Plata
+│   ├── RDP_TerraClimate/      # TerraClimate outputs for Rio de la Plata
 │   └── analysis_outputs/       # Analysis outputs from running the workflow script
+│       ├── figures/           # Time series, climatology, maps
+│       ├── comparisons/       # Dataset comparison plots
+│       ├── method_comparison/ # Peff method comparison outputs
+│       ├── annual/            # Annual aggregations
+│       ├── climatology/       # Monthly climatology
+│       ├── growing_season/    # Growing season aggregations
+│       ├── anomalies/         # Anomaly outputs
+│       ├── trend/             # Trend analysis outputs
+│       └── zonal_stats/       # Zonal statistics CSV files
 ├── .github/                 # GitHub configuration
 │   └── workflows/
 │       └── docs.yml         # GitHub Pages deployment workflow
@@ -615,14 +626,11 @@ Examples/
     ├── trend/                      # Trend analysis (Sen's slope)
     │   ├── ERA5Land/
     │   └── TerraClimate/
-    ├── zonal/                      # Zonal statistics
-    │   ├── sample_zones.geojson    # Eastern & Western RDP zones
+    ├── zonal_stats/                # Zonal statistics
     │   ├── ERA5Land/
-    │   │   ├── zonal_stats.csv
-    │   │   └── zonal_summary.png
+    │   │   └── zonal_stats.csv
     │   └── TerraClimate/
-    │       ├── zonal_stats.csv
-    │       └── zonal_summary.png
+    │       └── zonal_stats.csv
     ├── figures/                    # Visualizations by dataset
     │   ├── ERA5Land/
     │   │   ├── time_series.png
@@ -638,8 +646,15 @@ Examples/
     │   ├── scatter_comparison.png      # Scatter plot
     │   ├── annual_comparison.png       # Annual bar chart
     │   └── zonal_comparison.png        # Zonal statistics comparison
-    ├── ERA5Land_effective_precip_2000_2023.nc
-    └── TerraClimate_effective_precip_2000_2023.nc
+    ├── method_comparison/          # Peff method comparison
+    │   ├── ERA5Land_method_maps_2020_01.png
+    │   ├── ERA5Land_method_curves.png
+    │   ├── TerraClimate_method_maps_2020_01.png
+    │   ├── TerraClimate_method_curves.png
+    │   └── method_statistics.csv
+    ├── rdp_zones.geojson           # Eastern & Western RDP zones
+    ├── ERA5Land_effective_precip_2000_2025.nc
+    └── TerraClimate_effective_precip_2000_2025.nc
 ```
 
 ### Example Outputs
