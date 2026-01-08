@@ -63,7 +63,7 @@ from pycropwat.analysis import (
 # =============================================================================
 
 # GEE Configuration
-GEE_PROJECT = "your-gee-project-id"  # Replace with your GEE project ID
+GEE_PROJECT = None  # Set to your GEE project ID, or None to use default
 STUDY_AREA_ASSET = "projects/ssebop-471916/assets/Riodelaplata"
 
 # Data sources configuration
@@ -84,7 +84,7 @@ DATASETS = {
 
 # Time period
 START_YEAR = 2000
-END_YEAR = 2023
+END_YEAR = 2025
 
 # Climatology period (for anomaly calculations)
 CLIM_START = 2000
@@ -196,7 +196,7 @@ def create_sample_zones():
 # Step 1: Process Effective Precipitation
 # =============================================================================
 
-def process_effective_precipitation(dataset_name: str, skip_if_exists: bool = True):
+def process_effective_precipitation(dataset_name: str, skip_if_exists: bool = True, n_workers: int = 4):
     """
     Process effective precipitation for a given dataset.
     
@@ -206,6 +206,8 @@ def process_effective_precipitation(dataset_name: str, skip_if_exists: bool = Tr
         Name of the dataset ('ERA5Land' or 'TerraClimate')
     skip_if_exists : bool
         Skip processing if output files already exist
+    n_workers : int
+        Number of parallel workers for processing
     """
     config = DATASETS[dataset_name]
     output_dir = Path(config['output_dir'])
@@ -232,7 +234,7 @@ def process_effective_precipitation(dataset_name: str, skip_if_exists: bool = Tr
     
     ep.process(
         output_dir=str(output_dir),
-        n_workers=4
+        n_workers=n_workers
     )
     
     logger.info(f"Completed processing {dataset_name}")
@@ -1190,7 +1192,7 @@ def export_netcdf(dataset_name: str):
 # Main Workflow
 # =============================================================================
 
-def run_full_workflow(skip_processing: bool = True):
+def run_full_workflow(skip_processing: bool = True, n_workers: int = 4):
     """
     Run the complete pyCropWat workflow.
     
@@ -1199,6 +1201,8 @@ def run_full_workflow(skip_processing: bool = True):
     skip_processing : bool
         If True, skip GEE processing if data already exists.
         Set to False to force reprocessing.
+    n_workers : int
+        Number of parallel workers for GEE processing.
     """
     logger.info("=" * 60)
     logger.info("pyCropWat Complete Workflow")
@@ -1219,7 +1223,7 @@ def run_full_workflow(skip_processing: bool = True):
         logger.info("=" * 40)
         
         # Step 1: Process effective precipitation
-        process_effective_precipitation(dataset_name, skip_if_exists=skip_processing)
+        process_effective_precipitation(dataset_name, skip_if_exists=skip_processing, n_workers=n_workers)
         
         # Step 2: Temporal aggregation
         agg = run_temporal_aggregation(dataset_name)
@@ -1310,6 +1314,12 @@ if __name__ == '__main__':
         type=str,
         help='GEE project ID for authentication'
     )
+    parser.add_argument(
+        '--workers', '-w',
+        type=int,
+        default=4,
+        help='Number of parallel workers for GEE processing (default: 4)'
+    )
     
     args = parser.parse_args()
     
@@ -1321,4 +1331,4 @@ if __name__ == '__main__':
     if args.analysis_only:
         run_analysis_only()
     else:
-        run_full_workflow(skip_processing=not args.force_reprocess)
+        run_full_workflow(skip_processing=not args.force_reprocess, n_workers=args.workers)

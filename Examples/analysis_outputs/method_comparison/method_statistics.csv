@@ -1,10 +1,10 @@
 ,,mean_peff,mean_peff,mean_peff,mean_peff,mean_precip
 ,,mean,std,min,max,mean
 dataset,method,,,,,
-ERA5Land,cropwat,66.61,25.66,20.04,107.25,86.63
-ERA5Land,dependable_rainfall,48.6,28.37,7.61,106.6,86.63
-ERA5Land,fao_aglw,45.03,25.93,7.15,99.18,86.63
-ERA5Land,fixed_percentage,60.64,28.04,15.65,114.81,86.63
+ERA5Land,cropwat,66.73,25.62,20.34,107.36,86.9
+ERA5Land,dependable_rainfall,48.8,28.49,7.87,107.1,86.9
+ERA5Land,fao_aglw,45.22,26.06,7.39,99.72,86.9
+ERA5Land,fixed_percentage,60.83,28.12,15.93,115.25,86.9
 TerraClimate,cropwat,62.68,24.04,17.08,100.08,81.68
 TerraClimate,dependable_rainfall,45.33,27.93,5.68,103.8,81.68
 TerraClimate,fao_aglw,42.19,25.99,5.41,98.34,81.68

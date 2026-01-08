@@ -38,8 +38,8 @@ pyCropWat/
 ├── Examples/                # Example outputs and scripts
 │   ├── README.md               # Detailed workflow documentation
 │   ├── complete_workflow_example.py  # Complete workflow script
-│   ├── RDP_ERA5Land.zip           # ERA5-Land outputs for Rio de la Plata
-│   ├── RDP_TerraClimate.zip       # TerraClimate outputs for Rio de la Plata
+│   ├── RDP_ERA5Land           # ERA5-Land outputs for Rio de la Plata
+│   ├── RDP_TerraClimate      # TerraClimate outputs for Rio de la Plata
 │   └── analysis_outputs/       # Analysis outputs from running the workflow script
 ├── .github/                 # GitHub configuration
 │   └── workflows/

@@ -208,11 +208,6 @@ __marimo__/
 
 *.js
 *.xml
-Examples/*
-!Examples/*.zip
-!Examples/*.py
-!Examples/analysis_outputs/
-!Examples/*.md
 .DS_Store
 *.pdf
 javascripts/
