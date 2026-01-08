@@ -2,6 +2,73 @@
 
 All notable changes to pyCropWat will be documented in this file.
 
+## [Unreleased] - develop branch
+
+### ✨ New Features
+
+#### Multiple Effective Precipitation Methods
+- **CROPWAT (default)**: USDA SCS method as implemented in FAO CROPWAT
+- **FAO/AGLW**: FAO/AGLW formula from FAO Irrigation Paper No. 33
+- **Fixed Percentage**: Configurable percentage method (default 70%)
+- **Dependable Rainfall**: FAO method at specified probability levels (50-90%)
+
+#### Temporal Aggregation (`pycropwat.analysis.TemporalAggregator`)
+- Seasonal aggregation (DJF, MAM, JJA, SON)
+- Annual totals with configurable statistics (sum, mean, min, max, std)
+- Growing season aggregation with customizable start/end months
+- Custom date range aggregation
+- Multi-year climatology calculation
+
+#### Statistical Analysis (`pycropwat.analysis.StatisticalAnalyzer`)
+- Anomaly calculation (absolute, percent, standardized)
+- Trend analysis with linear regression
+- Theil-Sen slope with Mann-Kendall significance test
+- Zonal statistics for polygon features (CSV export)
+
+#### Visualization (`pycropwat.analysis.Visualizer`)
+- Time series plots
+- Monthly climatology bar charts
+- Single raster map visualization
+- Interactive maps using leafmap or folium (`plot_interactive_map()`)
+- Side-by-side dataset comparison with difference map (`plot_comparison()`)
+- Scatter plot comparison with R², RMSE, bias statistics (`plot_scatter_comparison()`)
+- Annual totals comparison bar chart (`plot_annual_comparison()`)
+
+#### Enhanced Export Options
+- NetCDF export with time dimension (`export_to_netcdf()`)
+- Cloud-Optimized GeoTIFF conversion (`export_to_cog()`)
+- Zonal statistics CSV export
+
+#### CLI Enhancements
+- **New subcommand structure**: `pycropwat <command> [OPTIONS]`
+- `process` subcommand: Main effective precipitation calculation
+- `aggregate` subcommand: Temporal aggregation (annual, seasonal, growing season, climatology)
+- `analyze` subcommand: Statistical analysis (anomaly, trend, zonal)
+- `export` subcommand: Export to NetCDF or Cloud-Optimized GeoTIFF
+- `plot` subcommand: Visualization (timeseries, climatology, map, interactive, compare, scatter, annual-compare)
+- `--method` flag to select effective precipitation method
+- `--percentage` flag for fixed_percentage method
+- `--probability` flag for dependable_rainfall method
+- `--list-methods` to display available methods
+- `--version` flag to display version
+- Legacy mode support for backwards compatibility
+
+### 📦 New Dependencies
+- `scipy>=1.9.0` - Statistical functions
+- `matplotlib>=3.5.0` - Visualization
+- `rasterstats>=0.18.0` - Zonal statistics
+- `pandas>=1.4.0` - Data manipulation
+
+### 📦 Optional Dependencies
+- `leafmap>=0.30.0` - Interactive maps (optional)
+- `folium>=0.14.0` - Alternative interactive maps (optional)
+
+### 📁 New Files
+- `pycropwat/methods.py` - Effective precipitation calculation methods
+- `pycropwat/analysis.py` - Temporal aggregation, statistics, visualization
+
+---
+
 ## [1.0.0] - 2026-01-08
 
 ### 🎉 Initial Release

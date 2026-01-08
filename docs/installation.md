@@ -28,6 +28,9 @@ conda activate pycropwat
 
 # Install package
 pip install -e .
+
+# Or with interactive map support (leafmap, localtileserver)
+pip install -e ".[interactive]"
 ```
 
 ## Dependencies

@@ -68,20 +68,246 @@ results = ep.process(
 results = ep.process_sequential(output_dir='./outputs')
 ```
 
-## Static Method: CROPWAT Formula
+## Effective Precipitation Methods
 
-The CROPWAT effective precipitation formula is available as a static method:
+pyCropWat supports multiple methods for calculating effective precipitation:
 
 ```python
+from pycropwat.methods import (
+    cropwat_effective_precip,
+    fao_aglw_effective_precip,
+    fixed_percentage_effective_precip,
+    dependable_rainfall_effective_precip
+)
 import numpy as np
-from pycropwat import EffectivePrecipitation
 
-# Calculate effective precipitation for an array
 precip = np.array([50, 100, 200, 300, 400])
-eff_precip = EffectivePrecipitation.cropwat_effective_precip(precip)
 
-print(eff_precip)
+# CROPWAT (USDA SCS method - default)
+peff_cropwat = cropwat_effective_precip(precip)
 # [46.  72.  136.  155.  165.]
+
+# FAO/AGLW method
+peff_fao = fao_aglw_effective_precip(precip)
+
+# Fixed percentage (e.g., 80%)
+peff_fixed = fixed_percentage_effective_precip(precip, percentage=0.8)
+# [40.  80.  160.  240.  320.]
+
+# Dependable rainfall at 75% probability
+peff_depend = dependable_rainfall_effective_precip(precip, probability=0.75)
+```
+
+## Temporal Aggregation
+
+The `TemporalAggregator` class provides functions for aggregating monthly data:
+
+```python
+from pycropwat.analysis import TemporalAggregator
+
+agg = TemporalAggregator('./outputs')
+
+# Annual totals
+annual = agg.annual_aggregate(
+    year=2020,
+    method='sum',
+    output_path='./annual_2020.tif'
+)
+
+# Seasonal aggregation (DJF, MAM, JJA, SON)
+summer = agg.seasonal_aggregate(
+    year=2020,
+    season='JJA',
+    method='sum',
+    output_path='./summer_2020.tif'
+)
+
+# Growing season (customizable months)
+growing = agg.growing_season_aggregate(
+    year=2020,
+    start_month=4,
+    end_month=10,
+    method='sum',
+    output_path='./growing_2020.tif'
+)
+
+# Custom month range
+custom = agg.custom_aggregate(
+    year=2020,
+    months=[5, 6, 7, 8],
+    method='mean',
+    output_path='./may_aug_mean_2020.tif'
+)
+
+# Multi-year climatology (long-term average)
+climatology = agg.climatology(
+    start_year=1990,
+    end_year=2020,
+    method='mean',
+    output_dir='./climatology/'
+)
+```
+
+## Statistical Analysis
+
+The `StatisticalAnalyzer` class provides anomaly detection, trend analysis, and zonal statistics:
+
+```python
+from pycropwat.analysis import StatisticalAnalyzer, TemporalAggregator
+
+agg = TemporalAggregator('./outputs')
+stats = StatisticalAnalyzer(agg)
+
+# Calculate anomaly relative to climatology
+anomaly = stats.calculate_anomaly(
+    year=2023,
+    month=6,
+    clim_start=1990,
+    clim_end=2020,
+    anomaly_type='percent',  # 'absolute', 'percent', or 'standardized'
+    output_path='./anomaly_2023_06.tif'
+)
+
+# Trend analysis with linear regression
+trend_linear = stats.calculate_trend(
+    start_year=2000,
+    end_year=2020,
+    month=None,  # Annual trends; specify 1-12 for specific month
+    method='linear',
+    output_dir='./trend_linear/'
+)
+# Returns dict with 'slope', 'intercept', 'r_squared', 'p_value' rasters
+
+# Trend analysis with Theil-Sen slope and Mann-Kendall test
+trend_sen = stats.calculate_trend(
+    start_year=2000,
+    end_year=2020,
+    method='sen',
+    output_dir='./trend_sen/'
+)
+# Returns dict with 'slope', 'p_value' rasters
+
+# Zonal statistics by polygon
+zonal_df = stats.zonal_statistics(
+    zones_path='./regions.shp',
+    start_year=2000,
+    end_year=2020,
+    months=None,  # All months; or specify list [6, 7, 8]
+    stats=['mean', 'sum', 'min', 'max', 'std'],
+    output_path='./zonal_stats.csv'
+)
+```
+
+## Export Functions
+
+Export data to different formats:
+
+```python
+from pycropwat.analysis import export_to_netcdf, export_to_cog
+
+# Export time series to NetCDF with time dimension
+export_to_netcdf(
+    input_dir='./outputs',
+    output_path='./data.nc',
+    variable='effective_precip',
+    pattern='effective_precip_*.tif',
+    compression=True
+)
+
+# Convert to Cloud-Optimized GeoTIFF
+export_to_cog(
+    input_path='./effective_precip_2020_06.tif',
+    output_path='./cog_2020_06.tif'
+)
+
+# Batch convert to COGs
+from pathlib import Path
+for tif in Path('./outputs').glob('effective_precip_*.tif'):
+    export_to_cog(str(tif), f'./cogs/{tif.name}')
+```
+
+## Visualization
+
+The `Visualizer` class provides plotting functions:
+
+```python
+from pycropwat.analysis import Visualizer
+
+viz = Visualizer('./outputs')
+
+# Time series plot
+fig = viz.plot_time_series(
+    start_year=2000,
+    end_year=2020,
+    stat='mean',  # Spatial statistic: 'mean', 'sum', 'min', 'max'
+    title='Effective Precipitation Time Series',
+    figsize=(12, 6),
+    output_path='./timeseries.png'
+)
+
+# Monthly climatology bar chart
+fig = viz.plot_monthly_climatology(
+    start_year=2000,
+    end_year=2020,
+    stat='mean',
+    title='Monthly Climatology',
+    output_path='./climatology.png'
+)
+
+# Single raster map
+fig = viz.plot_raster(
+    year=2020,
+    month=6,
+    cmap='YlGnBu',
+    vmin=0,
+    vmax=150,
+    title='Effective Precipitation - June 2020',
+    output_path='./map_2020_06.png'
+)
+
+# Interactive HTML map (requires leafmap or folium)
+viz.plot_interactive_map(
+    year=2020,
+    month=6,
+    cmap='YlGnBu',
+    opacity=0.7,
+    basemap='OpenStreetMap',
+    output_path='./map.html'
+)
+
+# Compare two datasets side-by-side with difference map
+fig = viz.plot_comparison(
+    other_input_dir='./terraclimate_outputs',
+    year=2020,
+    month=6,
+    label1='ERA5',
+    label2='TerraClimate',
+    cmap='YlGnBu',
+    diff_cmap='RdBu',
+    output_path='./comparison.png'
+)
+
+# Scatter plot comparison with statistics (R², RMSE, bias)
+fig = viz.plot_scatter_comparison(
+    other_input_dir='./terraclimate_outputs',
+    start_year=2000,
+    end_year=2020,
+    months=None,  # All months
+    sample_size=10000,  # Max points to plot
+    label1='ERA5 (mm)',
+    label2='TerraClimate (mm)',
+    output_path='./scatter.png'
+)
+
+# Annual totals comparison bar chart
+fig = viz.plot_annual_comparison(
+    other_input_dir='./terraclimate_outputs',
+    start_year=2000,
+    end_year=2020,
+    label1='ERA5',
+    label2='TerraClimate',
+    output_path='./annual_compare.png'
+)
 ```
 
 ## Working with Results
