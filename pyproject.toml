@@ -4,12 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pycropwat"
-version = "0.1.0"
+version = "1.0.0"
 description = "Calculate CROPWAT effective precipitation from Google Earth Engine climate data"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Sayantan Majumdar"}
+    {name = "Sayantan Majumdar", email = "sayantan.majumdar@dri.edu"},
+    {name = "Peter ReVelle", email = "peter.revelle@dri.edu"},
+    {name = "Soheil Nozari", email = "soheil.nozari@colostate.edu"}
+    {name = "Justin Huntington", email = "justin.huntington@dri.edu"},
+    {name = "Ryan Smith", email = "ryan.smith@colostate.edu"}   
 ]
 keywords = [
     "earth-engine",
