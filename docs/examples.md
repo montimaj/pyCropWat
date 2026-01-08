@@ -744,8 +744,8 @@ The complete workflow example generates the following visualizations using real 
 #### Time Series & Climatology
 
 <p align="center">
-  <img src="assets/examples/figures/ERA5Land/time_series.png" width="48%" alt="Time Series">
-  <img src="assets/examples/figures/ERA5Land/monthly_climatology.png" width="48%" alt="Monthly Climatology">
+  <img src="../assets/examples/figures/ERA5Land/time_series.png" width="48%" alt="Time Series">
+  <img src="../assets/examples/figures/ERA5Land/monthly_climatology.png" width="48%" alt="Monthly Climatology">
 </p>
 
 *Left: Monthly effective precipitation time series (2000-2025). Right: Monthly climatology showing seasonal patterns.*
@@ -753,9 +753,9 @@ The complete workflow example generates the following visualizations using real 
 #### Spatial Maps
 
 <p align="center">
-  <img src="assets/examples/figures/ERA5Land/map_2023_06.png" width="32%" alt="Winter Map">
-  <img src="assets/examples/figures/ERA5Land/map_2023_01.png" width="32%" alt="Summer Map">
-  <img src="assets/examples/figures/ERA5Land/map_notable_2015_12.png" width="32%" alt="El Niño Event">
+  <img src="../assets/examples/figures/ERA5Land/map_2023_06.png" width="32%" alt="Winter Map">
+  <img src="../assets/examples/figures/ERA5Land/map_2023_01.png" width="32%" alt="Summer Map">
+  <img src="../assets/examples/figures/ERA5Land/map_notable_2015_12.png" width="32%" alt="El Niño Event">
 </p>
 
 *Left: Winter dry season (June 2023). Center: Summer wet season (January 2023). Right: El Niño event (December 2015).*
@@ -763,20 +763,20 @@ The complete workflow example generates the following visualizations using real 
 #### Dataset Comparison (ERA5-Land vs TerraClimate)
 
 <p align="center">
-  <img src="assets/examples/comparisons/comparison_2023_06.png" width="100%" alt="Side-by-side Comparison">
+  <img src="../assets/examples/comparisons/comparison_2023_06.png" width="100%" alt="Side-by-side Comparison">
 </p>
 
 *Side-by-side comparison of ERA5-Land and TerraClimate effective precipitation with difference map.*
 
 <p align="center">
-  <img src="assets/examples/comparisons/scatter_comparison.png" width="48%" alt="Scatter Plot">
-  <img src="assets/examples/comparisons/annual_comparison.png" width="48%" alt="Annual Comparison">
+  <img src="../assets/examples/comparisons/scatter_comparison.png" width="48%" alt="Scatter Plot">
+  <img src="../assets/examples/comparisons/annual_comparison.png" width="48%" alt="Annual Comparison">
 </p>
 
 *Left: Scatter plot comparison with R², RMSE, and bias statistics. Right: Annual totals comparison.*
 
 <p align="center">
-  <img src="assets/examples/comparisons/zonal_comparison.png" width="70%" alt="Zonal Comparison">
+  <img src="../assets/examples/comparisons/zonal_comparison.png" width="70%" alt="Zonal Comparison">
 </p>
 
 *Zonal statistics comparison between ERA5-Land and TerraClimate for Eastern and Western Rio de la Plata regions.*
@@ -784,13 +784,13 @@ The complete workflow example generates the following visualizations using real 
 #### Method Comparison
 
 <p align="center">
-  <img src="assets/examples/method_comparison/ERA5Land_method_maps_2020_01.png" width="100%" alt="Method Comparison Maps">
+  <img src="../assets/examples/method_comparison/ERA5Land_method_maps_2020_01.png" width="100%" alt="Method Comparison Maps">
 </p>
 
 *Comparison of effective precipitation methods: CROPWAT, FAO/AGLW, Fixed Percentage (70%), and Dependable Rainfall (75%).*
 
 <p align="center">
-  <img src="assets/examples/method_comparison/ERA5Land_method_curves.png" width="60%" alt="Method Curves">
+  <img src="../assets/examples/method_comparison/ERA5Land_method_curves.png" width="60%" alt="Method Curves">
 </p>
 
 *Theoretical response curves for different effective precipitation methods.*
