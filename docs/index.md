@@ -2,23 +2,29 @@
 
 **Calculate CROPWAT effective precipitation from Google Earth Engine climate data**
 
+[![Release](https://img.shields.io/badge/release-v1.0.0-green.svg)](https://github.com/montimaj/pyCropWat/releases)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://montimaj.github.io/pyCropWat)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
 ## Overview
 
-pyCropWat is a Python package that calculates effective precipitation using the CROPWAT methodology from any Google Earth Engine (GEE) climate dataset. It supports:
+pyCropWat is a Python package that calculates effective precipitation using multiple methodologies from any Google Earth Engine (GEE) climate dataset. It supports:
 
 - **Multiple GEE datasets**: ERA5-Land, TerraClimate, CHIRPS, GPM IMERG, and more
+- **Multiple Peff methods**: CROPWAT (USDA SCS), FAO/AGLW, Fixed Percentage, Dependable Rainfall
 - **Flexible geometry inputs**: Shapefiles, GeoJSON, or GEE FeatureCollection assets
 - **Automatic chunked downloads**: Handles large regions that exceed GEE pixel limits
+- **Temporal aggregation**: Annual, seasonal, growing season, climatology
+- **Statistical analysis**: Anomaly detection, trend analysis, zonal statistics
+- **Visualization**: Time series, maps, interactive HTML maps, dataset comparison
+- **Export options**: NetCDF, Cloud-Optimized GeoTIFFs
 - **Parallel processing**: Uses Dask for efficient multi-month processing
 - **CLI and Python API**: Use from command line or integrate into your workflows
 
 ## CROPWAT Formula
 
-The effective precipitation is calculated using the USDA SCS method as implemented in FAO CROPWAT ([Smith, 1992](https://www.fao.org/sustainable-development-goals-helpdesk/champion/article-detail/cropwat/en); [Muratoglu et al., 2023](https://doi.org/10.1016/j.watres.2023.120011)):
+The default effective precipitation is calculated using the USDA SCS method as implemented in FAO CROPWAT ([Smith, 1992](https://www.fao.org/sustainable-development-goals-helpdesk/champion/article-detail/cropwat/en); [Muratoglu et al., 2023](https://doi.org/10.1016/j.watres.2023.120011)):
 
 $$
 P_{eff} = \begin{cases}
@@ -27,34 +33,192 @@ P \times \frac{125 - 0.2P}{125} & \text{if } P \leq 250 \text{ mm} \\
 \end{cases}
 $$
 
+## Effective Precipitation Methods
+
+pyCropWat supports four different methods for calculating effective precipitation:
+
+### 1. CROPWAT (USDA SCS) - Default
+
+The USDA Soil Conservation Service method as implemented in FAO CROPWAT software. This is the most widely used method for irrigation planning.
+
+| Condition | Formula |
+|-----------|---------|
+| P ≤ 250 mm | $P_{eff} = P \times \frac{125 - 0.2P}{125}$ |
+| P > 250 mm | $P_{eff} = 0.1P + 125$ |
+
+**Usage:**
+```python
+ep = EffectivePrecipitation(..., method='cropwat')
+```
+
+**Reference:** Smith, M. (1992). *CROPWAT: A computer program for irrigation planning and management*. FAO Irrigation and Drainage Paper No. 46.
+
+---
+
+### 2. FAO/AGLW
+
+The FAO Land and Water Division (AGLW) formula from FAO Irrigation and Drainage Paper No. 33.
+
+| Condition | Formula |
+|-----------|---------|
+| P ≤ 250 mm | $P_{eff} = \max(0.6P - 10, 0)$ |
+| P > 250 mm | $P_{eff} = 0.8P - 25$ |
+
+**Usage:**
+```python
+ep = EffectivePrecipitation(..., method='fao_aglw')
+```
+
+**Reference:** FAO. (1986). *Yield response to water*. FAO Irrigation and Drainage Paper No. 33.
+
+---
+
+### 3. Fixed Percentage
+
+A simple method that assumes a constant fraction of precipitation is effective. Common values range from 70-80%.
+
+$$P_{eff} = P \times f$$
+
+Where $f$ is the effectiveness fraction (default: 0.7 or 70%).
+
+**Usage:**
+```python
+ep = EffectivePrecipitation(..., method='fixed_percentage', method_params={'percentage': 0.7})
+```
+
+---
+
+### 4. Dependable Rainfall
+
+The FAO Dependable Rainfall method estimates the amount of rainfall that can be depended upon at a given probability level. More conservative than other methods.
+
+| Condition | Formula (at 75% probability) |
+|-----------|------------------------------|
+| P < 100 mm | $P_{eff} = \max(0.6P - 10, 0)$ |
+| P ≥ 100 mm | $P_{eff} = 0.8P - 25$ |
+
+A probability scaling factor is applied for other probability levels:
+- 50% probability: ~1.2× base estimate
+- 75% probability: 1.0× base estimate (default)
+- 90% probability: ~0.8× base estimate
+
+**Usage:**
+```python
+ep = EffectivePrecipitation(..., method='dependable_rainfall', method_params={'probability': 0.75})
+```
+
+**Reference:** FAO. (1992). *CROPWAT - A computer program for irrigation planning and management*. FAO Irrigation and Drainage Paper No. 46.
+
+---
+
+### Method Comparison
+
+| Method | Use Case | Characteristics |
+|--------|----------|-----------------|
+| **CROPWAT** | General irrigation planning | Balanced, widely validated |
+| **FAO/AGLW** | Yield response studies | Similar to CROPWAT, slightly different curve |
+| **Fixed Percentage** | Quick estimates, calibration | Simple, requires local calibration |
+| **Dependable Rainfall** | Risk-averse planning | Conservative, probability-based |
+
+!!! tip "Choosing a Method"
+    - Use **CROPWAT** (default) for most irrigation planning applications
+    - Use **FAO/AGLW** when following FAO Irrigation Paper No. 33 guidelines
+    - Use **Fixed Percentage** when you have locally calibrated effectiveness values
+    - Use **Dependable Rainfall** for drought-sensitive crops or risk-averse planning
+
 ## Quick Start
 
+### CLI
+
 ```bash
-# Install
+# Install (basic)
 pip install pycropwat
 
-# Run from CLI
-pycropwat --asset ECMWF/ERA5_LAND/MONTHLY_AGGR \
-          --band total_precipitation_sum \
-          --gee-geometry projects/my-project/assets/study_area \
-          --start-year 2020 \
-          --end-year 2023 \
-          --scale-factor 1000 \
-          --output ./outputs
+# Or with interactive map support
+pip install pycropwat[interactive]
+
+# Process effective precipitation
+pycropwat process \
+    --asset ECMWF/ERA5_LAND/MONTHLY_AGGR \
+    --band total_precipitation_sum \
+    --gee-geometry projects/my-project/assets/study_area \
+    --start-year 2020 --end-year 2023 \
+    --scale-factor 1000 \
+    --output ./outputs
+
+# Create annual aggregation
+pycropwat aggregate --input ./outputs --type annual --year 2020 \
+    --output ./annual_2020.tif
+
+# Generate time series plot
+pycropwat plot timeseries --input ./outputs \
+    --start-year 2020 --end-year 2023 --output ./timeseries.png
+```
+
+### Python
+
+```python
+from pycropwat import EffectivePrecipitation
+from pycropwat.analysis import TemporalAggregator, Visualizer
+
+# Process effective precipitation
+ep = EffectivePrecipitation(
+    asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
+    precip_band='total_precipitation_sum',
+    gee_geometry_asset='projects/my-project/assets/study_area',
+    start_year=2020,
+    end_year=2023,
+    precip_scale_factor=1000
+)
+ep.process(output_dir='./outputs', n_workers=4)
+
+# Create annual aggregation
+agg = TemporalAggregator('./outputs')
+agg.annual_aggregate(2020, output_path='./annual_2020.tif')
+
+# Generate time series plot
+viz = Visualizer('./outputs')
+viz.plot_time_series(2020, 2023, output_path='./timeseries.png')
 ```
 
 ## Features
 
-- 📊 **Monthly effective precipitation rasters** (GeoTIFF)
-- 📈 **Effective precipitation fraction** (ratio of effective to total)
+### ✅ Implemented
+
+- 📊 **Multiple Peff methods**: CROPWAT, FAO/AGLW, Fixed Percentage, Dependable Rainfall
+- 🗓️ **Temporal aggregation**: Annual, seasonal, growing season, climatology
+- 📈 **Statistical analysis**: Anomaly detection, trend analysis (linear, Theil-Sen), zonal statistics
+- 📉 **Visualization**: Time series, climatology charts, maps, interactive HTML maps, dataset comparison (side-by-side, scatter, annual)
+- 📤 **Export options**: NetCDF with time dimension, Cloud-Optimized GeoTIFFs
 - 🌍 **Any GEE climate dataset** with precipitation band
 - 🗺️ **Flexible resolution control** (native or custom scale)
 - ⚡ **Parallel processing** with Dask
 - 🧩 **Automatic tiling** for large regions
 
+### 🚧 Planned
+
+- 🌾 **Crop water requirements**: Kc integration, net irrigation requirement
+- 📈 **Advanced analysis**: Drought indices (SPI, SPEI), direct cloud export
+- ✅ **Validation tools**: Station comparison, uncertainty quantification
+- 💧 **Water balance**: ET integration, simple water balance
+
 ## Documentation
 
 For full documentation, visit [https://montimaj.github.io/pyCropWat](https://montimaj.github.io/pyCropWat)
+
+- [Quick Start Guide](user-guide/quickstart.md)
+- [CLI Reference](user-guide/cli.md)
+- [Python API](user-guide/api.md)
+- [Examples](examples.md)
+- [Complete Workflow Example](examples.md#example-12-complete-workflow) - A comprehensive script demonstrating all features
+
+!!! tip "Try the Complete Workflow Example"
+    The `Examples/complete_workflow_example.py` script provides a ready-to-run demonstration of all pyCropWat features using real Rio de la Plata basin data:
+    
+    ```bash
+    # Run with existing sample data
+    python Examples/complete_workflow_example.py --analysis-only
+    ```
 
 ## Funding
 
@@ -72,54 +236,6 @@ This work was supported by a U.S. Army Corps of Engineers grant (W912HZ25C0016) 
 **Research Scientist:**
 
 - Dr. Soheil Nozari (Colorado State University)
-
-## Roadmap
-
-The following features are under consideration for future releases:
-
-### 📊 Temporal Aggregation
-- Seasonal summaries (DJF, MAM, JJA, SON)
-- Annual totals with statistics
-- Growing season aggregations based on crop calendars
-- Custom date range aggregations
-
-### 🌾 Crop Water Requirements
-- Crop coefficient (Kc) integration for different crop types/stages
-- Net irrigation requirement (ETc - Peff) calculations
-- Crop calendar support for region-specific growing seasons
-
-### 📈 Statistical Analysis
-- Long-term climatology (e.g., 30-year normals)
-- Anomaly detection (departure from normal)
-- Trend analysis using Mann-Kendall or Sen's slope
-- Drought indices (SPI, SPEI) integration
-
-### 🔄 Additional Effective Precipitation Methods
-- FAO/AGLW method
-- Fixed percentage method (e.g., 70-80% of rainfall)
-- Dependable rainfall (FAO method at different probability levels)
-
-### 📤 Enhanced Export Options
-- NetCDF output for time-series analysis
-- Cloud-Optimized GeoTIFFs (COGs)
-- Zonal statistics CSV export by polygon
-- Direct cloud storage export (GCS, S3)
-
-### 📉 Visualization
-- Built-in plotting functions for time series
-- Interactive maps (folium/leafmap integration)
-- Comparison plots between datasets
-
-### ✅ Validation Tools
-- Station data comparison module
-- Cross-dataset validation (e.g., ERA5 vs TerraClimate)
-- Uncertainty quantification
-
-### 💧 Water Balance Extension
-- Evapotranspiration integration (from MODIS, SSEBop, OpenET)
-- Simple water balance (P - ET - Runoff)
-
-**Have a feature request?** Please submit your ideas via [GitHub Issues](https://github.com/montimaj/pyCropWat/issues). We welcome community contributions and feedback!
 
 ## License
 

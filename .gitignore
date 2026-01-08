@@ -210,6 +210,9 @@ __marimo__/
 *.xml
 Examples/*
 !Examples/*.zip
+!Examples/*.py
+!Examples/analysis_outputs/
+!Examples/*.md
 .DS_Store
 *.pdf
 javascripts/

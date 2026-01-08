@@ -16,6 +16,14 @@ from dask import delayed, compute
 from dask.diagnostics import ProgressBar
 
 from .utils import load_geometry, get_date_range, get_monthly_dates, initialize_gee
+from .methods import (
+    cropwat_effective_precip,
+    fao_aglw_effective_precip,
+    fixed_percentage_effective_precip,
+    dependable_rainfall_effective_precip,
+    get_method_function,
+    PeffMethod
+)
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +99,8 @@ class EffectivePrecipitation:
         precip_scale_factor: float = 1.0,
         gee_project: Optional[str] = None,
         gee_geometry_asset: Optional[str] = None,
+        method: PeffMethod = 'cropwat',
+        method_params: Optional[dict] = None,
     ):
         self.asset_id = asset_id
         self.precip_band = precip_band
@@ -101,6 +111,11 @@ class EffectivePrecipitation:
         self.scale = scale  # None means use native resolution
         self.precip_scale_factor = precip_scale_factor
         self.gee_project = gee_project
+        self.method = method
+        self.method_params = method_params or {}
+        
+        # Get the effective precipitation function
+        self._peff_function = get_method_function(method)
         
         # Validate that at least one geometry source is provided
         if geometry_path is None and gee_geometry_asset is None:
@@ -637,8 +652,11 @@ class EffectivePrecipitation:
         if pr_da is None:
             return None, None
         
-        # Calculate effective precipitation
-        ep_arr = self.cropwat_effective_precip(pr_da.values)
+        # Calculate effective precipitation using the configured method
+        if self.method_params:
+            ep_arr = self._peff_function(pr_da.values, **self.method_params)
+        else:
+            ep_arr = self._peff_function(pr_da.values)
         
         # Calculate effective precipitation fraction
         with np.errstate(divide='ignore', invalid='ignore'):
@@ -654,7 +672,7 @@ class EffectivePrecipitation:
                 'long_name': 'effective_precipitation',
                 'year': year,
                 'month': month,
-                'method': 'CROPWAT'
+                'method': self.method.upper()
             }
         )
         ep_da = ep_da.rio.write_crs("EPSG:4326")
@@ -669,7 +687,7 @@ class EffectivePrecipitation:
                 'long_name': 'effective_precipitation_fraction',
                 'year': year,
                 'month': month,
-                'method': 'CROPWAT'
+                'method': self.method.upper()
             }
         )
         epf_da = epf_da.rio.write_crs("EPSG:4326")
