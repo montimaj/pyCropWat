@@ -1,0 +1,27 @@
+# Include essential files
+include LICENSE
+include README.md
+include CHANGELOG.md
+include requirements.txt
+include environment.yml
+include pyproject.toml
+
+# Include package source
+recursive-include pycropwat *.py
+
+# Exclude large files and example data
+prune Examples
+prune site
+prune docs/assets/examples
+prune *.egg-info
+
+# Exclude specific file types globally
+global-exclude *.tif
+global-exclude *.tiff
+global-exclude *.nc
+global-exclude *.geojson
+global-exclude __pycache__
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude .DS_Store
+global-exclude .git*

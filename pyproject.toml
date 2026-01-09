@@ -87,6 +87,10 @@ Issues = "https://github.com/montimaj/pyCropWat/issues"
 
 [tool.setuptools.packages.find]
 include = ["pycropwat*"]
+exclude = ["Examples*", "tests*", "docs*", "site*"]
+
+[tool.setuptools.package-data]
+pycropwat = ["py.typed"]
 
 [tool.black]
 line-length = 100
