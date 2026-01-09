@@ -13,8 +13,8 @@ authors = [
     {name = "Peter ReVelle", email = "peter.revelle@dri.edu"},
     {name = "Christopher Pearson", email = "christopher.pearson@dri.edu"},
     {name = "Soheil Nozari", email = "soheil.nozari@colostate.edu"},
-    {name = "Justin Huntington", email = "justin.huntington@dri.edu"},
-    {name = "Ryan Smith", email = "ryan.g.smith@colostate.edu"}   
+    {name = "Justin L. Huntington", email = "justin.huntington@dri.edu"},
+    {name = "Ryan G. Smith", email = "ryan.g.smith@colostate.edu"}   
 ]
 keywords = [
     "earth-engine",
