@@ -204,9 +204,9 @@ pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitatio
 
 | Component | Size | Notes |
 |-----------|------|-------|
-| Repository (code + docs) | ~20 MB | Core package, documentation, and assets |
+| Repository (code + docs) | ~16 MB | Core package, documentation, and assets |
 | Examples (sample outputs) | ~4 GB | Pre-computed TIF files for Rio de la Plata and Arizona |
-| **Total (full clone)** | **~4 GB** | Includes all example data |
+| **Total (full clone)** | **~6 GB** | Includes all example data |
 
 **Tip:** To clone without example data, use a shallow clone and exclude large files:
 ```bash

@@ -213,4 +213,4 @@ __marimo__/
 javascripts/
 # Large data files (GitHub 100MB limit)
 *.nc
-Examples/**/analysis_outputs/
+# Examples/**/analysis_outputs/

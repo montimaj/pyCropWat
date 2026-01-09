@@ -1,0 +1,110 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": 1,
+        "name": "Central AZ",
+        "description": "Central Arizona - Phoenix Metropolitan / Salt River Valley"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -113.0,
+              33.0
+            ],
+            [
+              -113.0,
+              34.0
+            ],
+            [
+              -111.0,
+              34.0
+            ],
+            [
+              -111.0,
+              33.0
+            ],
+            [
+              -113.0,
+              33.0
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": 2,
+        "name": "Southern AZ",
+        "description": "Southern Arizona - Tucson / Santa Cruz Valley"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -112.0,
+              31.5
+            ],
+            [
+              -112.0,
+              32.5
+            ],
+            [
+              -110.0,
+              32.5
+            ],
+            [
+              -110.0,
+              31.5
+            ],
+            [
+              -112.0,
+              31.5
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": 3,
+        "name": "Northern AZ",
+        "description": "Northern Arizona - Flagstaff / Colorado Plateau"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -112.5,
+              34.5
+            ],
+            [
+              -112.5,
+              36.0
+            ],
+            [
+              -110.5,
+              36.0
+            ],
+            [
+              -110.5,
+              34.5
+            ],
+            [
+              -112.5,
+              34.5
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}
