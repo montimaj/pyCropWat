@@ -999,7 +999,7 @@ If you use pyCropWat in your research, please cite:
 
 ```bibtex
 @software{pycropwat,
-  author = {Majumdar, Sayantan and ReVelle, Peter and Nozari, Soheil and Huntington, Justin and Smith, Ryan},
+  author = {Majumdar, Sayantan and ReVelle, Peter and Pearson, Christopher and Nozari, Soheil and Huntington, Justin L. and Smith, Ryan G.},
   title = {pyCropWat: Python implementation of FAO CROPWAT effective precipitation using Google Earth Engine},
   year = {2026},
   url = {https://github.com/montimaj/pyCropWat}

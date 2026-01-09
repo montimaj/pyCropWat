@@ -411,6 +411,27 @@ pycropwat process --asset IDAHO_EPSCOR/GRIDMET --band pr \
 
 See [Examples](examples.md#arizona-usda-scs-example) for the complete Arizona workflow script.
 
+## Citation
+
+If you use pyCropWat in your research, please cite:
+
+```bibtex
+@software{pycropwat,
+  author = {Majumdar, Sayantan and ReVelle, Peter and Pearson, Christopher and Nozari, Soheil and Huntington, Justin L. and Smith, Ryan G.},
+  title = {pyCropWat: Python implementation of FAO CROPWAT effective precipitation using Google Earth Engine},
+  year = {2026},
+  url = {https://github.com/montimaj/pyCropWat}
+}
+```
+
+### Effective Precipitation Method References
+
+- Muratoglu, A., Bilgen, G. K., Angin, I., & Kodal, S. (2023). Performance analyses of effective rainfall estimation methods for accurate quantification of agricultural water footprint. *Water Research*, *238*, 120011. [https://doi.org/10.1016/j.watres.2023.120011](https://doi.org/10.1016/j.watres.2023.120011)
+
+- Smith, M. (1992). *CROPWAT: A computer program for irrigation planning and management* (FAO Irrigation and Drainage Paper No. 46). Food and Agriculture Organization of the United Nations. [https://www.fao.org/sustainable-development-goals-helpdesk/champion/article-detail/cropwat/en](https://www.fao.org/sustainable-development-goals-helpdesk/champion/article-detail/cropwat/en)
+
+- USDA SCS. (1993). Chapter 2 Irrigation Water Requirements. In Part 623 National Engineering Handbook. USDA Soil Conservation Service. [https://www.wcc.nrcs.usda.gov/ftpref/wntsc/waterMgt/irrigation/NEH15/ch2.pdf](https://www.wcc.nrcs.usda.gov/ftpref/wntsc/waterMgt/irrigation/NEH15/ch2.pdf)
+
 ## Funding
 
 This work was supported by a U.S. Army Corps of Engineers grant (W912HZ25C0016) for the project *"Improved Characterization of Groundwater Resources in Transboundary Watersheds using Satellite Data and Integrated Models."*
