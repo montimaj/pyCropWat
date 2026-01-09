@@ -1,6 +1,6 @@
 # pyCropWat
 
-**Calculate CROPWAT effective precipitation from Google Earth Engine climate data**
+**A Python Package for Computing Effective Precipitation Using Google Earth Engine Climate Data**
 
 [![Release](https://img.shields.io/badge/release-v1.0.0-green.svg)](https://github.com/montimaj/pyCropWat/releases)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://montimaj.github.io/pyCropWat)
