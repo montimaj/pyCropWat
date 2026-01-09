@@ -319,9 +319,9 @@ def usda_scs_effective_precip(
     Notes
     -----
     - AWC data for U.S.: projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite
-    - AWC data for global: projects/sat-io/open-datasets/FAO/HWSD_V2_SMU (band 'AWC')
-    - ETo data for U.S.: projects/openet/assets/reference_et/conus/gridmet/monthly/v1
-    - ETo data for global: projects/climate-engine-pro/assets/ce-ag-era5-v2/daily
+    - AWC data for global: projects/sat-io/open-datasets/FAO/HWSD_V2_SMU (band: 'AWC')
+    - ETo data for U.S.: projects/openet/assets/reference_et/conus/gridmet/monthly/v1 (band: 'eto')
+    - ETo data for global: projects/climate-engine-pro/assets/ce-ag-era5-v2/daily (band: 'ReferenceET_PenmanMonteith_FAO56')
     """
     # Convert mm to inches for calculation
     pr_inches = pr / 25.4

@@ -205,7 +205,7 @@ ep_global = EffectivePrecipitation(
         'awc_asset': 'projects/sat-io/open-datasets/FAO/HWSD_V2_SMU',
         'awc_band': 'AWC',
         'eto_asset': 'projects/climate-engine-pro/assets/ce-ag-era5-v2/daily',
-        'eto_band': 'ETo',
+        'eto_band': 'ReferenceET_PenmanMonteith_FAO56',
         'eto_is_daily': True,  # Will aggregate daily to monthly
         'rooting_depth': 1.0
     }

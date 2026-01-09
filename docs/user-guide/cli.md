@@ -174,7 +174,7 @@ pycropwat process \
     --awc-asset projects/sat-io/open-datasets/FAO/HWSD_V2_SMU \
     --awc-band AWC \
     --eto-asset projects/climate-engine-pro/assets/ce-ag-era5-v2/daily \
-    --eto-band ETo \
+    --eto-band ReferenceET_PenmanMonteith_FAO56 \
     --eto-is-daily \
     --rooting-depth 1.0 \
     --output ./output_usda_scs_global
@@ -541,7 +541,7 @@ pycropwat plot annual-compare --input ./era5_output --other-input ./terraclimate
 | Region | Asset ID | Band | Temporal |
 |--------|----------|------|----------|
 | U.S. (GridMET) | `projects/openet/assets/reference_et/conus/gridmet/monthly/v1` | `eto` | Monthly |
-| Global (AgERA5) | `projects/climate-engine-pro/assets/ce-ag-era5-v2/daily` | `ETo` | Daily (use `--eto-is-daily`) |
+| Global (AgERA5) | `projects/climate-engine-pro/assets/ce-ag-era5-v2/daily` | `ReferenceET_PenmanMonteith_FAO56` | Daily (use `--eto-is-daily`) |
 
 ## Exit Codes
 

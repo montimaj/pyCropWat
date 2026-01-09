@@ -137,10 +137,16 @@ class EffectivePrecipitation:
             
         For ``'usda_scs'``:
             - ``awc_asset`` (str): GEE Image asset ID for AWC data. Required.
+              U.S.: projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite
+              Global: projects/sat-io/open-datasets/FAO/HWSD_V2_SMU
             - ``awc_band`` (str): Band name for AWC. Default 'AWC'.
             - ``eto_asset`` (str): GEE ImageCollection asset ID for ETo. Required.
+              U.S.: projects/openet/assets/reference_et/conus/gridmet/monthly/v1
+              Global: projects/climate-engine-pro/assets/ce-ag-era5-v2/daily
             - ``eto_band`` (str): Band name for ETo. Default 'eto'.
+              U.S. (GridMET): 'eto', Global (AgERA5): 'ReferenceET_PenmanMonteith_FAO56'
             - ``eto_is_daily`` (bool): Whether ETo is daily. Default False.
+              Set True for AgERA5 daily data.
             - ``eto_scale_factor`` (float): Scale factor for ETo. Default 1.0.
             - ``rooting_depth`` (float): Rooting depth in meters. Default 1.0.
         
