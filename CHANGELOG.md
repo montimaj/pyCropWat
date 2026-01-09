@@ -11,6 +11,19 @@ All notable changes to pyCropWat will be documented in this file.
 - **FAO/AGLW**: FAO/AGLW formula from FAO Irrigation Paper No. 33
 - **Fixed Percentage**: Configurable percentage method (default 70%)
 - **Dependable Rainfall**: FAO method at specified probability levels (50-90%)
+- **FarmWest**: Washington State University's simple empirical formula: `Peff = (P - 5) × 0.75`
+- **USDA-SCS with AWC**: Site-specific method using Available Water Capacity and Reference ET from GEE assets
+
+#### USDA-SCS Method with AWC and ETo
+- Accounts for soil water holding capacity (AWC) and evaporative demand (ETo)
+- Supports U.S. datasets:
+  - AWC: `projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite`
+  - ETo: `projects/openet/assets/reference_et/conus/gridmet/monthly/v1`
+- Supports Global datasets:
+  - AWC: `projects/sat-io/open-datasets/FAO/HWSD_V2_SMU`
+  - ETo: `projects/climate-engine-pro/assets/ce-ag-era5-v2/daily`
+- Configurable crop rooting depth (default: 1 meter)
+- Daily ETo aggregation to monthly supported via `--eto-is-daily` flag
 
 #### Temporal Aggregation (`pycropwat.analysis.TemporalAggregator`)
 - Seasonal aggregation (DJF, MAM, JJA, SON)
@@ -49,6 +62,12 @@ All notable changes to pyCropWat will be documented in this file.
 - `--method` flag to select effective precipitation method
 - `--percentage` flag for fixed_percentage method
 - `--probability` flag for dependable_rainfall method
+- `--awc-asset` flag for USDA-SCS method AWC GEE asset
+- `--awc-band` flag for AWC band name
+- `--eto-asset` flag for USDA-SCS method ETo GEE asset
+- `--eto-band` flag for ETo band name
+- `--eto-is-daily` flag for daily ETo aggregation to monthly
+- `--rooting-depth` flag for crop rooting depth (USDA-SCS method)
 - `--list-methods` to display available methods
 - `--version` flag to display version
 - Legacy mode support for backwards compatibility
@@ -117,6 +136,7 @@ Full documentation available at: https://montimaj.github.io/pyCropWat
 
 - Sayantan Majumdar (Desert Research Institute)
 - Peter ReVelle (Desert Research Institute)
+- Christopher Pearson (Desert Research Institute)
 - Soheil Nozari (Colorado State University)
 - Justin Huntington (Desert Research Institute)
 - Ryan Smith (Colorado State University)

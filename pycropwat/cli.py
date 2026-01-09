@@ -63,6 +63,19 @@ def cmd_process(args):
             logger.error(f"Invalid months: {invalid_months}. Must be between 1 and 12.")
             sys.exit(1)
     
+    # Validate USDA-SCS method requirements
+    if args.method == 'usda_scs':
+        if not args.awc_asset:
+            logger.error("USDA-SCS method requires --awc-asset. "
+                        "U.S.: projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite, "
+                        "Global: projects/sat-io/open-datasets/FAO/HWSD_V2_SMU")
+            sys.exit(1)
+        if not args.eto_asset:
+            logger.error("USDA-SCS method requires --eto-asset. "
+                        "U.S.: projects/openet/assets/reference_et/conus/gridmet/monthly/v1, "
+                        "Global: projects/climate-engine-pro/assets/ce-ag-era5-v2/daily (set --eto-is-daily)")
+            sys.exit(1)
+    
     try:
         logger.info(f"Initializing effective precipitation processor...")
         logger.info(f"Asset: {args.asset}")
@@ -80,6 +93,16 @@ def cmd_process(args):
             method_params['percentage'] = args.percentage
         elif args.method == 'dependable_rainfall':
             method_params['probability'] = args.probability
+        elif args.method == 'usda_scs':
+            method_params['awc_asset'] = args.awc_asset
+            method_params['awc_band'] = args.awc_band
+            method_params['eto_asset'] = args.eto_asset
+            method_params['eto_band'] = args.eto_band
+            method_params['eto_is_daily'] = args.eto_is_daily
+            method_params['rooting_depth'] = args.rooting_depth
+            logger.info(f"AWC Asset: {args.awc_asset} (band: {args.awc_band})")
+            logger.info(f"ETo Asset: {args.eto_asset} (band: {args.eto_band})")
+            logger.info(f"Rooting Depth: {args.rooting_depth} m")
         
         ep = EffectivePrecipitation(
             asset_id=args.asset,
@@ -489,10 +512,23 @@ Examples:
     process_parser.add_argument('--months', '-m', type=int, nargs='+', help='Specific months to process (1-12)')
     process_parser.add_argument('--project', '-p', type=str, help='GEE project ID')
     process_parser.add_argument('--method', type=str, default='cropwat',
-                               choices=['cropwat', 'fao_aglw', 'fixed_percentage', 'dependable_rainfall'],
+                               choices=['cropwat', 'fao_aglw', 'fixed_percentage', 'dependable_rainfall', 'farmwest', 'usda_scs'],
                                help='Effective precipitation method')
     process_parser.add_argument('--percentage', type=float, default=0.7, help='Percentage for fixed_percentage method')
     process_parser.add_argument('--probability', type=float, default=0.75, help='Probability for dependable_rainfall method')
+    # USDA-SCS method parameters
+    process_parser.add_argument('--awc-asset', type=str, 
+                               help='GEE AWC asset for usda_scs method. U.S.: projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite, Global: projects/sat-io/open-datasets/FAO/HWSD_V2_SMU')
+    process_parser.add_argument('--awc-band', type=str, default='AWC',
+                               help='AWC band name. SSURGO is single-band, HWSD uses "AWC"')
+    process_parser.add_argument('--eto-asset', type=str,
+                               help='GEE ETo asset for usda_scs method. U.S.: projects/openet/assets/reference_et/conus/gridmet/monthly/v1, Global: projects/climate-engine-pro/assets/ce-ag-era5-v2/daily')
+    process_parser.add_argument('--eto-band', type=str, default='eto',
+                               help='ETo band name. GridMET: "eto", ERA5: "ReferenceET_PenmanMonteith_FAO56"')
+    process_parser.add_argument('--eto-is-daily', action='store_true',
+                               help='Set if ETo asset is daily (will aggregate to monthly)')
+    process_parser.add_argument('--rooting-depth', type=float, default=1.0,
+                               help='Crop rooting depth in meters for usda_scs method (default: 1.0)')
     process_parser.add_argument('--sequential', action='store_true', help='Process sequentially')
     add_common_args(process_parser)
     process_parser.set_defaults(func=cmd_process)

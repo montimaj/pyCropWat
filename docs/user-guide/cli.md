@@ -60,6 +60,12 @@ pycropwat process [OPTIONS]
 | `--method` | cropwat | Effective precipitation method |
 | `--percentage` | 0.7 | Percentage for fixed_percentage method |
 | `--probability` | 0.75 | Probability for dependable_rainfall method |
+| `--awc-asset` | None | GEE AWC asset for usda_scs method |
+| `--awc-band` | AWC | AWC band name |
+| `--eto-asset` | None | GEE ETo asset for usda_scs method |
+| `--eto-band` | eto | ETo band name |
+| `--eto-is-daily` | False | Set if ETo asset is daily (aggregates to monthly) |
+| `--rooting-depth` | 1.0 | Crop rooting depth in meters for usda_scs |
 | `--sequential` | False | Process sequentially instead of parallel |
 
 ### Available Methods
@@ -70,6 +76,8 @@ pycropwat process [OPTIONS]
 | `fao_aglw` | FAO AGLW formula |
 | `fixed_percentage` | Fixed percentage of rainfall |
 | `dependable_rainfall` | Dependable rainfall approach |
+| `farmwest` | FarmWest method: Peff = (P - 5) × 0.75 |
+| `usda_scs` | USDA-SCS with AWC and ETo (requires additional assets) |
 
 ### Examples
 

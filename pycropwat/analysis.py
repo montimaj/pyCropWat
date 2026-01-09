@@ -137,7 +137,8 @@ class TemporalAggregator:
             return None
         
         # Stack along new time dimension
-        stacked = xr.concat(arrays, dim='time')
+        # Use join='override' to handle slight coordinate differences between files
+        stacked = xr.concat(arrays, dim='time', join='override')
         stacked = stacked.assign_coords(time=valid_months)
         
         return stacked
@@ -222,7 +223,7 @@ class TemporalAggregator:
             if not arrays:
                 return None
             
-            stacked = xr.concat(arrays, dim='time')
+            stacked = xr.concat(arrays, dim='time', join='override')
         else:
             stacked = self._load_rasters(year, months)
             if stacked is None:
@@ -384,7 +385,7 @@ class TemporalAggregator:
                     arrays.append(da)
             
             if arrays:
-                stacked = xr.concat(arrays, dim='year')
+                stacked = xr.concat(arrays, dim='year', join='override')
                 clim = stacked.mean(dim='year')
                 clim.attrs = {
                     'long_name': f'climatology_month_{month:02d}',
@@ -490,7 +491,7 @@ class StatisticalAnalyzer:
             logger.warning(f"Insufficient data for climatology (need at least 3 years)")
             return None
         
-        clim_stacked = xr.concat(clim_arrays, dim='year')
+        clim_stacked = xr.concat(clim_arrays, dim='year', join='override')
         clim_mean = clim_stacked.mean(dim='year')
         clim_std = clim_stacked.std(dim='year')
         
@@ -576,7 +577,7 @@ class StatisticalAnalyzer:
             return None, None
         
         # Stack into time series
-        stacked = xr.concat(arrays, dim='year')
+        stacked = xr.concat(arrays, dim='year', join='override')
         stacked = stacked.assign_coords(year=years)
         
         # Calculate trend using vectorized approach
@@ -779,8 +780,10 @@ class StatisticalAnalyzer:
                 )
                 
                 for i, zs in enumerate(zone_stats):
+                    # Get zone_id from GeoJSON properties if available, otherwise use index
+                    zone_id = gdf.iloc[i].get('zone_id', i) if 'zone_id' in gdf.columns else i
                     row = {
-                        'zone_id': i,
+                        'zone_id': zone_id,
                         'year': year,
                         'month': month
                     }
@@ -1515,6 +1518,316 @@ class Visualizer:
         
         return fig
 
+    def plot_anomaly_map(
+        self,
+        anomaly_path: Union[str, Path],
+        cmap: str = 'RdBu',
+        title: Optional[str] = None,
+        output_path: Optional[Union[str, Path]] = None,
+        figsize: Tuple[int, int] = (10, 8),
+        center_value: float = 100.0
+    ):
+        """
+        Plot an anomaly map from a GeoTIFF file.
+        
+        Uses a diverging colormap centered at the specified value
+        (default 100 for percent anomalies).
+        
+        Parameters
+        ----------
+        anomaly_path : str or Path
+            Path to the anomaly GeoTIFF file.
+        cmap : str, optional
+            Colormap name. Default is 'RdBu' (red=dry, blue=wet).
+        title : str, optional
+            Plot title.
+        output_path : str or Path, optional
+            Path to save figure.
+        figsize : tuple, optional
+            Figure size (width, height) in inches.
+        center_value : float, optional
+            Center value for the diverging colormap. Default is 100 (for percent).
+            
+        Returns
+        -------
+        matplotlib.figure.Figure
+            The generated figure.
+        """
+        import matplotlib.pyplot as plt
+        
+        anomaly_path = Path(anomaly_path)
+        if not anomaly_path.exists():
+            raise FileNotFoundError(f"Anomaly file not found: {anomaly_path}")
+        
+        da = rioxarray.open_rasterio(anomaly_path).squeeze('band', drop=True)
+        da = da.where(da != 0)  # Mask nodata
+        
+        fig, ax = plt.subplots(figsize=figsize)
+        
+        # Calculate symmetric limits around center value
+        vmax = max(
+            abs(float(da.min()) - center_value), 
+            abs(float(da.max()) - center_value), 
+            50
+        )
+        
+        im = da.plot(
+            ax=ax,
+            cmap=cmap,
+            vmin=center_value - vmax,
+            vmax=center_value + vmax,
+            cbar_kwargs={'label': 'Anomaly [% of Climatology]'}
+        )
+        
+        ax.set_title(title or f'Effective Precipitation Anomaly')
+        ax.set_xlabel('Longitude [°]')
+        ax.set_ylabel('Latitude [°]')
+        
+        plt.tight_layout()
+        
+        if output_path:
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            logger.info(f"Saved anomaly map: {output_path}")
+        
+        return fig
+
+    def plot_climatology_map(
+        self,
+        climatology_path: Union[str, Path],
+        cmap: str = 'YlGnBu',
+        title: Optional[str] = None,
+        output_path: Optional[Union[str, Path]] = None,
+        figsize: Tuple[int, int] = (10, 8),
+        vmin: Optional[float] = None,
+        vmax: Optional[float] = None
+    ):
+        """
+        Plot a climatology map from a GeoTIFF file.
+        
+        Parameters
+        ----------
+        climatology_path : str or Path
+            Path to the climatology GeoTIFF file.
+        cmap : str, optional
+            Colormap name. Default is 'YlGnBu'.
+        title : str, optional
+            Plot title.
+        output_path : str or Path, optional
+            Path to save figure.
+        figsize : tuple, optional
+            Figure size (width, height) in inches.
+        vmin, vmax : float, optional
+            Color scale limits.
+            
+        Returns
+        -------
+        matplotlib.figure.Figure
+            The generated figure.
+        """
+        import matplotlib.pyplot as plt
+        
+        climatology_path = Path(climatology_path)
+        if not climatology_path.exists():
+            raise FileNotFoundError(f"Climatology file not found: {climatology_path}")
+        
+        da = rioxarray.open_rasterio(climatology_path).squeeze('band', drop=True)
+        da = da.where(da != 0)  # Mask nodata
+        
+        fig, ax = plt.subplots(figsize=figsize)
+        
+        im = da.plot(
+            ax=ax,
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+            cbar_kwargs={'label': 'Climatology [mm]'}
+        )
+        
+        ax.set_title(title or f'Effective Precipitation Climatology')
+        ax.set_xlabel('Longitude [°]')
+        ax.set_ylabel('Latitude [°]')
+        
+        plt.tight_layout()
+        
+        if output_path:
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            logger.info(f"Saved climatology map: {output_path}")
+        
+        return fig
+
+    def plot_trend_map(
+        self,
+        slope_path: Union[str, Path],
+        pvalue_path: Optional[Union[str, Path]] = None,
+        cmap: str = 'RdBu',
+        title: Optional[str] = None,
+        output_path: Optional[Union[str, Path]] = None,
+        figsize: Tuple[int, int] = (10, 8),
+        show_significance: bool = True,
+        significance_level: float = 0.05
+    ):
+        """
+        Plot a trend map from slope GeoTIFF, optionally with significance overlay.
+        
+        Parameters
+        ----------
+        slope_path : str or Path
+            Path to the slope (trend) GeoTIFF file.
+        pvalue_path : str or Path, optional
+            Path to the p-value GeoTIFF file for significance overlay.
+        cmap : str, optional
+            Colormap name. Default is 'RdBu' (red=decreasing, blue=increasing).
+        title : str, optional
+            Plot title.
+        output_path : str or Path, optional
+            Path to save figure.
+        figsize : tuple, optional
+            Figure size (width, height) in inches.
+        show_significance : bool, optional
+            Whether to overlay significance stippling. Default is True.
+        significance_level : float, optional
+            P-value threshold for significance. Default is 0.05.
+            
+        Returns
+        -------
+        matplotlib.figure.Figure
+            The generated figure.
+        """
+        import matplotlib.pyplot as plt
+        
+        slope_path = Path(slope_path)
+        if not slope_path.exists():
+            raise FileNotFoundError(f"Slope file not found: {slope_path}")
+        
+        da_slope = rioxarray.open_rasterio(slope_path).squeeze('band', drop=True)
+        da_slope = da_slope.where(da_slope != 0)
+        
+        fig, ax = plt.subplots(figsize=figsize)
+        
+        # Symmetric color limits centered at 0
+        vmax_slope = max(abs(float(da_slope.min())), abs(float(da_slope.max())), 0.5)
+        
+        im = da_slope.plot(
+            ax=ax,
+            cmap=cmap,
+            vmin=-vmax_slope,
+            vmax=vmax_slope,
+            cbar_kwargs={'label': 'Trend Slope [mm/month/year]'}
+        )
+        
+        # Add significance stippling if p-value file provided
+        if show_significance and pvalue_path:
+            pvalue_path = Path(pvalue_path)
+            if pvalue_path.exists():
+                da_pvalue = rioxarray.open_rasterio(pvalue_path).squeeze('band', drop=True)
+                significant = (da_pvalue < significance_level) & (da_pvalue != 0)
+                
+                if significant.sum() > 0:
+                    # Subsample for stippling
+                    step = max(1, min(da_pvalue.shape) // 50)
+                    sig_y, sig_x = np.where(significant.values[::step, ::step])
+                    
+                    if len(sig_x) > 0:
+                        x_coords = da_pvalue.x.values[::step][sig_x]
+                        y_coords = da_pvalue.y.values[::step][sig_y]
+                        
+                        ax.scatter(x_coords, y_coords, marker='.', s=1, c='black', 
+                                  alpha=0.3, label=f'p < {significance_level}')
+                        ax.legend(loc='lower right')
+        
+        ax.set_title(title or 'Effective Precipitation Trend')
+        ax.set_xlabel('Longitude [°]')
+        ax.set_ylabel('Latitude [°]')
+        
+        plt.tight_layout()
+        
+        if output_path:
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            logger.info(f"Saved trend map: {output_path}")
+        
+        return fig
+
+    def plot_trend_panel(
+        self,
+        slope_path: Union[str, Path],
+        pvalue_path: Union[str, Path],
+        title: Optional[str] = None,
+        output_path: Optional[Union[str, Path]] = None,
+        figsize: Tuple[int, int] = (16, 6)
+    ):
+        """
+        Plot a two-panel figure with slope and p-value maps side by side.
+        
+        Parameters
+        ----------
+        slope_path : str or Path
+            Path to the slope (trend) GeoTIFF file.
+        pvalue_path : str or Path
+            Path to the p-value GeoTIFF file.
+        title : str, optional
+            Overall figure title (used for slope panel).
+        output_path : str or Path, optional
+            Path to save figure.
+        figsize : tuple, optional
+            Figure size (width, height) in inches.
+            
+        Returns
+        -------
+        matplotlib.figure.Figure
+            The generated figure.
+        """
+        import matplotlib.pyplot as plt
+        
+        slope_path = Path(slope_path)
+        pvalue_path = Path(pvalue_path)
+        
+        if not slope_path.exists():
+            raise FileNotFoundError(f"Slope file not found: {slope_path}")
+        if not pvalue_path.exists():
+            raise FileNotFoundError(f"P-value file not found: {pvalue_path}")
+        
+        da_slope = rioxarray.open_rasterio(slope_path).squeeze('band', drop=True)
+        da_slope = da_slope.where(da_slope != 0)
+        
+        da_pvalue = rioxarray.open_rasterio(pvalue_path).squeeze('band', drop=True)
+        da_pvalue = da_pvalue.where(da_pvalue != 0)
+        
+        fig, axes = plt.subplots(1, 2, figsize=figsize)
+        
+        # Plot 1: Slope (trend magnitude)
+        vmax_slope = max(abs(float(da_slope.min())), abs(float(da_slope.max())), 0.5)
+        
+        da_slope.plot(
+            ax=axes[0],
+            cmap='RdBu',
+            vmin=-vmax_slope,
+            vmax=vmax_slope,
+            cbar_kwargs={'label': 'Trend Slope [mm/month/year]'}
+        )
+        axes[0].set_title(title or 'Effective Precipitation Trend')
+        axes[0].set_xlabel('Longitude [°]')
+        axes[0].set_ylabel('Latitude [°]')
+        
+        # Plot 2: P-value (significance)
+        da_pvalue.plot(
+            ax=axes[1],
+            cmap='RdYlGn_r',  # Green for low p-values (significant)
+            vmin=0,
+            vmax=0.1,
+            cbar_kwargs={'label': 'P-value'}
+        )
+        axes[1].set_title('Trend Significance (p < 0.05 = significant)')
+        axes[1].set_xlabel('Longitude [°]')
+        axes[1].set_ylabel('Latitude [°]')
+        
+        plt.tight_layout()
+        
+        if output_path:
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            logger.info(f"Saved trend panel: {output_path}")
+        
+        return fig
+
 
 def export_to_netcdf(
     input_dir: Union[str, Path],
@@ -1570,7 +1883,7 @@ def export_to_netcdf(
         raise ValueError("No valid files found")
     
     # Stack into time series
-    stacked = xr.concat(arrays, dim='time')
+    stacked = xr.concat(arrays, dim='time', join='override')
     stacked = stacked.assign_coords(time=times)
     stacked.name = variable_name
     stacked.attrs['units'] = 'mm'

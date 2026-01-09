@@ -13,7 +13,9 @@ PeffMethod = Literal[
     "cropwat",
     "fao_aglw", 
     "fixed_percentage",
-    "dependable_rainfall"
+    "dependable_rainfall",
+    "farmwest",
+    "usda_scs"
 ]
 
 
@@ -180,6 +182,126 @@ def dependable_rainfall_effective_precip(
     return np.maximum(ep, 0).astype(np.float32)
 
 
+def farmwest_effective_precip(pr: np.ndarray) -> np.ndarray:
+    """
+    Calculate effective precipitation using the FarmWest method.
+    
+    This is a simple empirical formula used by Washington State University's
+    FarmWest program for irrigation scheduling in the Pacific Northwest.
+    
+    Formula:
+        Peff = (P - 5) × 0.75 (but not less than 0)
+    
+    The method assumes the first 5 mm is lost to interception/evaporation,
+    and 75% of the remaining precipitation is effective.
+    
+    Parameters
+    ----------
+    pr : np.ndarray
+        Precipitation in mm.
+        
+    Returns
+    -------
+    np.ndarray
+        Effective precipitation in mm.
+        
+    References
+    ----------
+    FarmWest. Effective Precipitation. Washington State University.
+    https://farmwest.com/climate/calculator-information/et/effective-precipitation/
+    """
+    ep = np.maximum((pr - 5) * 0.75, 0)
+    return ep.astype(np.float32)
+
+
+def usda_scs_effective_precip(
+    pr: np.ndarray,
+    eto: np.ndarray,
+    awc: np.ndarray,
+    rooting_depth: float = 1.0
+) -> np.ndarray:
+    """
+    Calculate effective precipitation using the USDA-SCS method with AWC.
+    
+    This method accounts for soil water holding capacity and evaporative
+    demand to estimate effective precipitation. It is based on the USDA
+    Soil Conservation Service method that considers soil storage factors.
+    
+    Formula:
+        1. Calculate soil storage depth: d = AWC × 0.5 × rooting_depth (inches)
+        2. Calculate storage factor: sf = 0.531747 + 0.295164×d - 0.057697×d² + 0.003804×d³
+        3. Calculate effective precipitation:
+           Peff = sf × (P^0.82416 × 0.70917 - 0.11556) × 10^(ETo × 0.02426)
+        4. Peff is clamped to be between 0 and min(P, ETo)
+    
+    Note: Internal calculations are done in inches, output is converted to mm.
+    
+    Parameters
+    ----------
+    pr : np.ndarray
+        Total precipitation in mm.
+    eto : np.ndarray
+        Reference evapotranspiration in mm.
+    awc : np.ndarray
+        Available Water Capacity in inches/inch (volumetric fraction).
+        For SSURGO data, this is typically in units of cm/cm.
+    rooting_depth : float, optional
+        Crop rooting depth in meters. Default is 1.0 m.
+        
+    Returns
+    -------
+    np.ndarray
+        Effective precipitation in mm.
+        
+    References
+    ----------
+    USDA SCS. (1993). Chapter 2 Irrigation Water Requirements. In Part 623
+    National Engineering Handbook. USDA Soil Conservation Service.
+    https://www.wcc.nrcs.usda.gov/ftpref/wntsc/waterMgt/irrigation/NEH15/ch2.pdf
+    
+    Notes
+    -----
+    - AWC data for U.S.: projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite
+    - AWC data for global: projects/sat-io/open-datasets/FAO/HWSD_V2_SMU (band 'AWC')
+    - ETo data for U.S.: projects/openet/assets/reference_et/conus/gridmet/monthly/v1
+    - ETo data for global: projects/climate-engine-pro/assets/ce-ag-era5-v2/daily
+    """
+    # Convert mm to inches for calculation
+    pr_inches = pr / 25.4
+    eto_inches = eto / 25.4
+    
+    # Convert rooting depth to inches (1 meter = 39.37 inches)
+    rz_inches = rooting_depth * 39.37
+    
+    # Calculate soil storage depth (d term for eq. 2-85)
+    # d = AWC × 0.5 × rooting_depth_inches
+    d = awc * 0.5 * rz_inches
+    
+    # Calculate storage factor (sf) using polynomial equation (eq. 2-85)
+    sf = 0.531747 + 0.295164 * d - 0.057697 * np.power(d, 2) + 0.003804 * np.power(d, 3)
+    
+    # Calculate base effective precipitation term
+    # (P^0.82416 × 0.70917 - 0.11556)
+    pr_term = np.power(np.maximum(pr_inches, 0.001), 0.82416) * 0.70917 - 0.11556
+    pr_term = np.maximum(pr_term, 0)  # Ensure non-negative
+    
+    # Calculate ETo adjustment term: 10^(ETo × 0.02426)
+    eto_term = np.power(10, eto_inches * 0.02426)
+    
+    # Calculate effective precipitation (eq. 2-84) in inches
+    ep_inches = sf * pr_term * eto_term
+    
+    # Clamp EP: must be <= P and <= ETo, and >= 0
+    ep_inches = np.minimum(ep_inches, pr_inches)
+    ep_inches = np.minimum(ep_inches, eto_inches)
+    ep_inches = np.maximum(ep_inches, 0)
+    
+    # Convert back to mm
+    ep = ep_inches * 25.4
+    
+    return ep.astype(np.float32)
+
+
 def get_method_function(method: PeffMethod):
     """
     Get the effective precipitation function for a given method name.
@@ -188,7 +310,7 @@ def get_method_function(method: PeffMethod):
     ----------
     method : str
         Method name: 'cropwat', 'fao_aglw', 'fixed_percentage', 
-        or 'dependable_rainfall'.
+        'dependable_rainfall', 'farmwest', or 'usda_scs'.
         
     Returns
     -------
@@ -205,6 +327,8 @@ def get_method_function(method: PeffMethod):
         'fao_aglw': fao_aglw_effective_precip,
         'fixed_percentage': fixed_percentage_effective_precip,
         'dependable_rainfall': dependable_rainfall_effective_precip,
+        'farmwest': farmwest_effective_precip,
+        'usda_scs': usda_scs_effective_precip,
     }
     
     if method not in methods:
@@ -229,4 +353,6 @@ def list_available_methods() -> dict:
         'fao_aglw': 'FAO/AGLW formula from FAO Irrigation Paper No. 33',
         'fixed_percentage': 'Simple fixed percentage method (default 70%)',
         'dependable_rainfall': 'FAO Dependable Rainfall at specified probability',
+        'farmwest': 'FarmWest method: Peff = (P - 5) × 0.75',
+        'usda_scs': 'USDA-SCS method with AWC and ETo (requires GEE assets)',
     }

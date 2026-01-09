@@ -77,7 +77,9 @@ from pycropwat.methods import (
     cropwat_effective_precip,
     fao_aglw_effective_precip,
     fixed_percentage_effective_precip,
-    dependable_rainfall_effective_precip
+    dependable_rainfall_effective_precip,
+    farmwest_effective_precip,
+    usda_scs_effective_precip
 )
 import numpy as np
 
@@ -96,6 +98,15 @@ peff_fixed = fixed_percentage_effective_precip(precip, percentage=0.8)
 
 # Dependable rainfall at 75% probability
 peff_depend = dependable_rainfall_effective_precip(precip, probability=0.75)
+
+# FarmWest method
+peff_farmwest = farmwest_effective_precip(precip)
+# [33.75  71.25  146.25  221.25  296.25]
+
+# USDA-SCS method (requires AWC and ETo arrays)
+eto = np.array([80, 120, 180, 220, 260])  # mm
+awc = np.array([0.15, 0.15, 0.15, 0.15, 0.15])  # fraction
+peff_usda = usda_scs_effective_precip(precip, eto, awc, rooting_depth=1.0)
 ```
 
 ## Temporal Aggregation
