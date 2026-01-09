@@ -19,7 +19,7 @@ effective.
 * dependable_rainfall: FAO Dependable Rainfall method. Estimates rainfall that can be depended
     upon at a given probability level (default 75%).
     
-* farmwest: FarmWest method (https://statics.teams.cdn.office.net/evergreen-assets/safelinks/2/atp-safelinks.html). 
+* farmwest: FarmWest method (https://farmwest.com/climate/calculator-information/et/effective-precipitation/). 
 Simple empirical formula assuming 5mm interception loss and 75% effectiveness.
     
 * usda_scs: USDA-SCS soil moisture depletion method. Accounts for soil water holding capacity (AWC) and 
@@ -71,14 +71,19 @@ PeffMethod = Literal[
 
 
 def cropwat_effective_precip(pr: np.ndarray) -> np.ndarray:
-    """
+    r"""
     Calculate effective precipitation using the USDA SCS/CROPWAT method.
     
     This is the default method used in FAO CROPWAT software.
     
-    Formula:
-        - If P <= 250 mm: Peff = P × (125 - 0.2 × P) / 125
-        - If P > 250 mm: Peff = 0.1 × P + 125
+    Formula
+    -------
+    $$
+    P_{eff} = \begin{cases}
+    P \times \frac{125 - 0.2P}{125} & \text{if } P \leq 250 \text{ mm} \\
+    0.1P + 125 & \text{if } P > 250 \text{ mm}
+    \end{cases}
+    $$
     
     Parameters
     ----------
@@ -108,14 +113,19 @@ def cropwat_effective_precip(pr: np.ndarray) -> np.ndarray:
 
 
 def fao_aglw_effective_precip(pr: np.ndarray) -> np.ndarray:
-    """
+    r"""
     Calculate effective precipitation using the FAO/AGLW formula.
     
     This method is used by FAO's Land and Water Division (AGLW).
     
-    Formula:
-        - If P <= 250 mm: Peff = 0.6 × P - 10 (but not less than 0)
-        - If P > 250 mm: Peff = 0.8 × P - 25
+    Formula
+    -------
+    $$
+    P_{eff} = \begin{cases}
+    \max(0.6P - 10, 0) & \text{if } P \leq 250 \text{ mm} \\
+    0.8P - 25 & \text{if } P > 250 \text{ mm}
+    \end{cases}
+    $$
     
     Parameters
     ----------
@@ -145,14 +155,17 @@ def fixed_percentage_effective_precip(
     pr: np.ndarray,
     percentage: float = 0.7
 ) -> np.ndarray:
-    """
+    r"""
     Calculate effective precipitation using a fixed percentage method.
     
     This simple method assumes a constant fraction of precipitation
     is effective. Common values range from 70-80%.
     
-    Formula:
-        Peff = P × percentage
+    Formula
+    -------
+    $$P_{eff} = P \times f$$
+    
+    where $f$ is the effectiveness fraction (default 0.7).
     
     Parameters
     ----------
@@ -180,16 +193,21 @@ def dependable_rainfall_effective_precip(
     pr: np.ndarray,
     probability: float = 0.75
 ) -> np.ndarray:
-    """
+    r"""
     Calculate effective precipitation using the FAO Dependable Rainfall method.
     
     This method estimates the amount of rainfall that can be depended upon
     at a given probability level. Based on the FAO method which considers
     that effective rainfall at 75% probability is approximately:
     
-    Formula (approximation for 75% probability):
-        - If P < 100 mm: Peff = 0.6 × P - 10 (but not less than 0)
-        - If P >= 100 mm: Peff = 0.8 × P - 25
+    Formula (approximation for 75% probability)
+    -------------------------------------------
+    $$
+    P_{eff} = \begin{cases}
+    \max(0.6P - 10, 0) & \text{if } P < 100 \text{ mm} \\
+    0.8P - 25 & \text{if } P \geq 100 \text{ mm}
+    \end{cases}
+    $$
     
     For other probability levels, a scaling factor is applied.
     
@@ -240,14 +258,15 @@ def dependable_rainfall_effective_precip(
 
 
 def farmwest_effective_precip(pr: np.ndarray) -> np.ndarray:
-    """
+    r"""
     Calculate effective precipitation using the FarmWest method.
     
     This is a simple empirical formula used by Washington State University's
     FarmWest program for irrigation scheduling in the Pacific Northwest.
     
-    Formula:
-        Peff = (P - 5) × 0.75 (but not less than 0)
+    Formula
+    -------
+    $$P_{eff} = \max((P - 5) \times 0.75, 0)$$
     
     The method assumes the first 5 mm is lost to interception/evaporation,
     and 75% of the remaining precipitation is effective.
@@ -265,7 +284,7 @@ def farmwest_effective_precip(pr: np.ndarray) -> np.ndarray:
         
     References
     ----------
-    FarmWest. Effective Precipitation. Washington State University.
+    FarmWest. Effective Precipitation.
     https://farmwest.com/climate/calculator-information/et/effective-precipitation/
     """
     ep = np.maximum((pr - 5) * 0.75, 0)
@@ -278,19 +297,20 @@ def usda_scs_effective_precip(
     awc: np.ndarray,
     rooting_depth: float = 1.0
 ) -> np.ndarray:
-    """
+    r"""
     Calculate effective precipitation using the USDA-SCS method with AWC.
     
     This method accounts for soil water holding capacity and evaporative
     demand to estimate effective precipitation. It is based on the USDA
     Soil Conservation Service method that considers soil storage factors.
     
-    Formula:
-        1. Calculate soil storage depth: d = AWC × 0.5 × rooting_depth (inches)
-        2. Calculate storage factor: sf = 0.531747 + 0.295164×d - 0.057697×d² + 0.003804×d³
-        3. Calculate effective precipitation:
-           Peff = sf × (P^0.82416 × 0.70917 - 0.11556) × 10^(ETo × 0.02426)
-        4. Peff is clamped to be between 0 and min(P, ETo)
+    Formula
+    -------
+    1. Calculate soil storage depth: $d = AWC \times 0.5 \times D_r$ (rooting depth in inches)
+    2. Calculate storage factor: $SF = 0.531747 + 0.295164 \cdot d - 0.057697 \cdot d^2 + 0.003804 \cdot d^3$
+    3. Calculate effective precipitation:
+       $P_{eff} = SF \times (P^{0.82416} \times 0.70917 - 0.11556) \times 10^{ET_o \times 0.02426}$
+    4. $P_{eff}$ is clamped to be between 0 and $\min(P, ET_o)$
     
     Note: Internal calculations are done in inches, output is converted to mm.
     
@@ -416,6 +436,6 @@ def list_available_methods() -> dict:
         'fao_aglw': 'FAO/AGLW formula from FAO Irrigation Paper No. 33',
         'fixed_percentage': 'Simple fixed percentage method (default 70%)',
         'dependable_rainfall': 'FAO Dependable Rainfall at specified probability',
-        'farmwest': 'FarmWest method: Peff = (P - 5) × 0.75',
+        'farmwest': r'FarmWest method: $P_{eff} = (P - 5) \times 0.75$',
         'usda_scs': 'USDA-SCS method with AWC and ETo (requires GEE assets)',
     }
