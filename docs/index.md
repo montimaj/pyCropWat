@@ -148,20 +148,20 @@ The USDA Soil Conservation Service method that accounts for soil water holding c
 
 **Usage (CLI - U.S.):**
 ```bash
-pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitation_sum \\
-    --method usda_scs \\
-    --awc-asset projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite \\
-    --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \\
+pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitation_sum \
+    --method usda_scs \
+    --awc-asset projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite \
+    --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \
     --eto-band eto --rooting-depth 1.0 ...
 ```
 
 **Usage (CLI - Global):**
 ```bash
-pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitation_sum \\
-    --method usda_scs \\
-    --awc-asset projects/sat-io/open-datasets/FAO/HWSD_V2_SMU --awc-band AWC \\
-    --eto-asset projects/climate-engine-pro/assets/ce-ag-era5-v2/daily \\
-    --eto-band ReferenceET_PenmanMonteith_FAO56 --eto-is-daily \\
+pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitation_sum \
+    --method usda_scs \
+    --awc-asset projects/sat-io/open-datasets/FAO/HWSD_V2_SMU --awc-band AWC \
+    --eto-asset projects/climate-engine-pro/assets/ce-ag-era5-v2/daily \
+    --eto-band ReferenceET_PenmanMonteith_FAO56 --eto-is-daily \
     --rooting-depth 1.0 ...
 ```
 
