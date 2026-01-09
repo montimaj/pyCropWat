@@ -58,8 +58,10 @@ pyCropWat/
 │       └── analysis_outputs/     # Analysis outputs (anomaly/climatology/trend maps)
 ├── .github/                 # GitHub configuration
 │   └── workflows/
-│       └── docs.yml         # GitHub Pages deployment workflow
+│       ├── docs.yml         # GitHub Pages deployment workflow
+│       └── publish.yml      # PyPI publishing workflow
 ├── CHANGELOG.md             # Release notes
+├── MANIFEST.in              # PyPI package manifest
 ├── mkdocs.yml               # MkDocs configuration
 ├── environment.yml          # Conda environment file
 ├── pyproject.toml           # Package configuration
