@@ -200,7 +200,21 @@ pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitatio
 
 ## Installation
 
+### Disk Space Requirements
+
+| Component | Size | Notes |
+|-----------|------|-------|
+| Repository (code + docs) | ~20 MB | Core package, documentation, and assets |
+| Examples (sample outputs) | ~4 GB | Pre-computed TIF files for Rio de la Plata and Arizona |
+| **Total (full clone)** | **~4 GB** | Includes all example data |
+
+**Tip:** To clone without example data, use a shallow clone and exclude large files:
+```bash
+git clone --depth 1 https://github.com/montimaj/pyCropWat.git
+```
+
 ### Using Conda (Recommended)
+
 
 ```bash
 # Clone the repository
