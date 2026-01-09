@@ -220,7 +220,7 @@ git clone --depth 1 https://github.com/montimaj/pyCropWat.git
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/pyCropWat.git
+git clone https://github.com/montimaj/pyCropWat.git
 cd pyCropWat
 
 # Create conda environment from environment.yml
@@ -243,7 +243,7 @@ pycropwat --help
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/pyCropWat.git
+git clone https://github.com/montimaj/pyCropWat.git
 cd pyCropWat
 
 # Create and activate a virtual environment (optional but recommended)
