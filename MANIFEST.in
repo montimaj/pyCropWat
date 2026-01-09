@@ -12,7 +12,7 @@ recursive-include pycropwat *.py
 # Exclude large files and example data
 prune Examples
 prune site
-prune docs/assets/examples
+prune docs
 prune *.egg-info
 
 # Exclude specific file types globally

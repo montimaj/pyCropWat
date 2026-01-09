@@ -2,6 +2,14 @@
 
 All notable changes to pyCropWat will be documented in this file.
 
+## [1.0.2] - 2026-01-09
+
+### 📦 Package & Distribution
+- Excluded documentation assets and example figures from PyPI package to reduce size
+- Converted all relative links and image paths to absolute GitHub URLs for PyPI README rendering
+
+---
+
 ## [1.0.1] - 2026-01-09
 
 ### 📦 Package & Distribution
