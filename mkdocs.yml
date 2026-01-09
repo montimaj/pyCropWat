@@ -72,6 +72,8 @@ nav:
     - Python API: user-guide/api.md
   - API Reference:
     - Core: api/core.md
+    - Methods: api/methods.md
+    - Analysis: api/analysis.md
     - Utilities: api/utils.md
     - CLI: api/cli.md
   - Examples: examples.md

@@ -1032,3 +1032,951 @@ The Arizona workflow generates the following visualizations:
 
 *Theoretical Peff response curves for Arizona conditions (AWC=150 mm/m, ETo=180 mm/month).*
 
+---
+
+## Example 13: Drought Monitoring Dashboard
+
+Build a drought monitoring system using effective precipitation anomalies.
+
+**Python:**
+
+```python
+from pycropwat import EffectivePrecipitation
+from pycropwat.analysis import TemporalAggregator, StatisticalAnalyzer, Visualizer
+import pandas as pd
+from pathlib import Path
+from datetime import datetime
+
+class DroughtMonitor:
+    """Simple drought monitoring using Peff anomalies."""
+    
+    def __init__(self, output_dir: str):
+        self.output_dir = Path(output_dir)
+        self.agg = TemporalAggregator(output_dir)
+        self.stats = StatisticalAnalyzer(output_dir)
+        self.viz = Visualizer(output_dir)
+    
+    def calculate_drought_index(self, year: int, month: int, 
+                                 clim_start: int = 1990, clim_end: int = 2020):
+        """Calculate standardized drought index (SPI-like for Peff)."""
+        anomaly = self.stats.calculate_anomaly(
+            year=year, month=month,
+            clim_start=clim_start, clim_end=clim_end,
+            anomaly_type='standardized'  # z-score
+        )
+        return anomaly
+    
+    def classify_drought(self, z_score):
+        """Classify drought based on standardized anomaly."""
+        # SPI-like classification
+        if z_score >= 2.0:
+            return "Extremely Wet"
+        elif z_score >= 1.5:
+            return "Very Wet"
+        elif z_score >= 1.0:
+            return "Moderately Wet"
+        elif z_score > -1.0:
+            return "Near Normal"
+        elif z_score > -1.5:
+            return "Moderate Drought"
+        elif z_score > -2.0:
+            return "Severe Drought"
+        else:
+            return "Extreme Drought"
+    
+    def generate_monthly_report(self, year: int, month: int):
+        """Generate monthly drought monitoring report."""
+        import numpy as np
+        
+        # Calculate anomaly
+        anomaly = self.calculate_drought_index(year, month)
+        
+        # Get spatial statistics
+        mean_z = float(anomaly.mean())
+        min_z = float(anomaly.min())
+        max_z = float(anomaly.max())
+        
+        # Calculate percent area in drought
+        drought_mask = anomaly < -1.0
+        drought_pct = float(drought_mask.sum() / drought_mask.size * 100)
+        
+        # Generate report
+        report = {
+            'date': f"{year}-{month:02d}",
+            'mean_anomaly': mean_z,
+            'min_anomaly': min_z,
+            'max_anomaly': max_z,
+            'drought_classification': self.classify_drought(mean_z),
+            'percent_area_drought': drought_pct
+        }
+        
+        # Create visualization
+        self.viz.plot_anomaly_map(
+            anomaly_path=f'./anomalies/anomaly_{year}_{month:02d}.tif',
+            title=f'Drought Index - {year}/{month:02d}\n{self.classify_drought(mean_z)}',
+            output_path=f'./reports/drought_{year}_{month:02d}.png'
+        )
+        
+        return report
+
+# Usage
+monitor = DroughtMonitor('./outputs')
+
+# Generate reports for 2023
+reports = []
+for month in range(1, 13):
+    report = monitor.generate_monthly_report(2023, month)
+    reports.append(report)
+    print(f"{report['date']}: {report['drought_classification']} "
+          f"({report['percent_area_drought']:.1f}% in drought)")
+
+# Save summary
+pd.DataFrame(reports).to_csv('./reports/drought_summary_2023.csv', index=False)
+```
+
+---
+
+## Example 14: Irrigation Scheduling Support
+
+Calculate crop water requirements using effective precipitation.
+
+**Python:**
+
+```python
+from pycropwat import EffectivePrecipitation
+from pycropwat.analysis import TemporalAggregator
+import numpy as np
+import xarray as xr
+import rioxarray
+
+def calculate_irrigation_requirement(
+    peff_path: str,
+    etc_path: str,  # Crop ET path
+    output_path: str
+) -> xr.DataArray:
+    """
+    Calculate net irrigation requirement.
+    
+    NIR = ETc - Peff (where ETc > Peff)
+    """
+    peff = rioxarray.open_rasterio(peff_path).squeeze('band', drop=True)
+    etc = rioxarray.open_rasterio(etc_path).squeeze('band', drop=True)
+    
+    # Net irrigation requirement
+    nir = np.maximum(etc - peff, 0)
+    
+    nir.attrs = {
+        'units': 'mm',
+        'long_name': 'net_irrigation_requirement'
+    }
+    nir.rio.to_raster(output_path)
+    
+    return nir
+
+
+def monthly_irrigation_schedule(
+    peff_dir: str,
+    etc_values: dict,  # {month: etc_mm}
+    year: int
+) -> dict:
+    """
+    Generate monthly irrigation schedule for a crop.
+    
+    Parameters
+    ----------
+    peff_dir : str
+        Directory with effective precipitation rasters
+    etc_values : dict
+        Monthly crop ET values in mm (e.g., from FAO-56)
+    year : int
+        Year to analyze
+        
+    Returns
+    -------
+    dict
+        Monthly irrigation requirements
+    """
+    agg = TemporalAggregator(peff_dir)
+    schedule = {}
+    
+    for month, etc in etc_values.items():
+        # Get monthly Peff
+        if year in agg._index and month in agg._index[year]:
+            peff_da = rioxarray.open_rasterio(
+                agg._index[year][month]
+            ).squeeze('band', drop=True)
+            
+            mean_peff = float(peff_da.mean())
+            nir = max(etc - mean_peff, 0)
+            
+            schedule[month] = {
+                'etc_mm': etc,
+                'peff_mm': mean_peff,
+                'nir_mm': nir,
+                'peff_fraction': mean_peff / etc if etc > 0 else 0
+            }
+    
+    return schedule
+
+
+# Example: Maize irrigation schedule for Arizona
+# ETc values from FAO-56 for maize (April-October growing season)
+maize_etc = {
+    4: 75,   # April - initial stage
+    5: 120,  # May - development
+    6: 180,  # June - mid-season
+    7: 200,  # July - mid-season (peak)
+    8: 180,  # August - mid-season
+    9: 120,  # September - late season
+    10: 60   # October - harvest
+}
+
+schedule = monthly_irrigation_schedule(
+    peff_dir='./Arizona/AZ_GridMET_USDA_SCS',
+    etc_values=maize_etc,
+    year=2023
+)
+
+print("\nMaize Irrigation Schedule - Arizona 2023")
+print("-" * 60)
+print(f"{'Month':<10} {'ETc':>8} {'Peff':>8} {'NIR':>8} {'Peff%':>8}")
+print("-" * 60)
+
+total_etc = 0
+total_peff = 0
+total_nir = 0
+
+for month, data in schedule.items():
+    month_name = ['Jan','Feb','Mar','Apr','May','Jun',
+                  'Jul','Aug','Sep','Oct','Nov','Dec'][month-1]
+    print(f"{month_name:<10} {data['etc_mm']:>8.1f} {data['peff_mm']:>8.1f} "
+          f"{data['nir_mm']:>8.1f} {data['peff_fraction']*100:>7.1f}%")
+    total_etc += data['etc_mm']
+    total_peff += data['peff_mm']
+    total_nir += data['nir_mm']
+
+print("-" * 60)
+print(f"{'TOTAL':<10} {total_etc:>8.1f} {total_peff:>8.1f} "
+      f"{total_nir:>8.1f} {total_peff/total_etc*100:>7.1f}%")
+```
+
+---
+
+## Example 15: Climate Change Impact Analysis
+
+Analyze changes in effective precipitation between time periods.
+
+**Python:**
+
+```python
+from pycropwat.analysis import TemporalAggregator, StatisticalAnalyzer, Visualizer
+import numpy as np
+import xarray as xr
+import matplotlib.pyplot as plt
+
+def climate_change_analysis(
+    input_dir: str,
+    historical_period: tuple = (1985, 2014),
+    recent_period: tuple = (2015, 2024),
+    output_dir: str = './climate_change'
+):
+    """
+    Compare effective precipitation between historical and recent periods.
+    """
+    from pathlib import Path
+    Path(output_dir).mkdir(exist_ok=True)
+    
+    agg = TemporalAggregator(input_dir)
+    
+    # Calculate climatologies for both periods
+    print(f"Calculating historical climatology ({historical_period[0]}-{historical_period[1]})...")
+    hist_clim = agg.multi_year_climatology(
+        *historical_period,
+        output_dir=f'{output_dir}/historical_climatology'
+    )
+    
+    print(f"Calculating recent climatology ({recent_period[0]}-{recent_period[1]})...")
+    recent_clim = agg.multi_year_climatology(
+        *recent_period,
+        output_dir=f'{output_dir}/recent_climatology'
+    )
+    
+    # Calculate change for each month
+    changes = {}
+    for month in range(1, 13):
+        if month in hist_clim and month in recent_clim:
+            change = recent_clim[month] - hist_clim[month]
+            pct_change = (change / hist_clim[month]) * 100
+            
+            changes[month] = {
+                'absolute': change,
+                'percent': pct_change,
+                'hist_mean': float(hist_clim[month].mean()),
+                'recent_mean': float(recent_clim[month].mean())
+            }
+            
+            # Save change maps
+            change.rio.to_raster(f'{output_dir}/change_absolute_{month:02d}.tif')
+            pct_change.rio.to_raster(f'{output_dir}/change_percent_{month:02d}.tif')
+    
+    # Create summary plot
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    
+    months = list(range(1, 13))
+    month_names = ['J','F','M','A','M','J','J','A','S','O','N','D']
+    hist_means = [changes[m]['hist_mean'] for m in months]
+    recent_means = [changes[m]['recent_mean'] for m in months]
+    abs_changes = [changes[m]['recent_mean'] - changes[m]['hist_mean'] for m in months]
+    pct_changes = [(r-h)/h*100 if h > 0 else 0 for h, r in zip(hist_means, recent_means)]
+    
+    # Monthly comparison
+    x = np.arange(12)
+    width = 0.35
+    axes[0,0].bar(x - width/2, hist_means, width, label=f'{historical_period[0]}-{historical_period[1]}')
+    axes[0,0].bar(x + width/2, recent_means, width, label=f'{recent_period[0]}-{recent_period[1]}')
+    axes[0,0].set_xticks(x)
+    axes[0,0].set_xticklabels(month_names)
+    axes[0,0].set_ylabel('Effective Precipitation (mm)')
+    axes[0,0].set_title('Monthly Climatology Comparison')
+    axes[0,0].legend()
+    
+    # Absolute change
+    colors = ['green' if c >= 0 else 'red' for c in abs_changes]
+    axes[0,1].bar(x, abs_changes, color=colors)
+    axes[0,1].axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+    axes[0,1].set_xticks(x)
+    axes[0,1].set_xticklabels(month_names)
+    axes[0,1].set_ylabel('Change (mm)')
+    axes[0,1].set_title('Absolute Change')
+    
+    # Percent change
+    colors = ['green' if c >= 0 else 'red' for c in pct_changes]
+    axes[1,0].bar(x, pct_changes, color=colors)
+    axes[1,0].axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+    axes[1,0].set_xticks(x)
+    axes[1,0].set_xticklabels(month_names)
+    axes[1,0].set_ylabel('Change (%)')
+    axes[1,0].set_title('Percent Change')
+    
+    # Annual summary
+    hist_annual = sum(hist_means)
+    recent_annual = sum(recent_means)
+    annual_change = recent_annual - hist_annual
+    annual_pct = (annual_change / hist_annual) * 100
+    
+    axes[1,1].bar(['Historical', 'Recent'], [hist_annual, recent_annual],
+                  color=['steelblue', 'coral'])
+    axes[1,1].set_ylabel('Annual Effective Precipitation (mm)')
+    axes[1,1].set_title(f'Annual Change: {annual_change:+.1f} mm ({annual_pct:+.1f}%)')
+    
+    plt.suptitle(f'Climate Change Impact on Effective Precipitation\n'
+                 f'{historical_period[0]}-{historical_period[1]} vs {recent_period[0]}-{recent_period[1]}',
+                 fontsize=14, y=1.02)
+    plt.tight_layout()
+    plt.savefig(f'{output_dir}/climate_change_summary.png', dpi=300, bbox_inches='tight')
+    
+    return changes
+
+# Run analysis
+changes = climate_change_analysis(
+    input_dir='./outputs',
+    historical_period=(1985, 2014),
+    recent_period=(2015, 2024)
+)
+```
+
+---
+
+## Example 16: Real-time Monitoring with Near Real-Time Data
+
+Use GPM IMERG for near real-time effective precipitation monitoring.
+
+**Python:**
+
+```python
+from pycropwat import EffectivePrecipitation
+from pycropwat.analysis import StatisticalAnalyzer, Visualizer
+from datetime import datetime, timedelta
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
+def near_realtime_monitoring(
+    geometry_path: str,
+    clim_start: int = 2001,
+    clim_end: int = 2020,
+    output_dir: str = './nrt_monitoring'
+):
+    """
+    Near real-time effective precipitation monitoring using GPM IMERG.
+    """
+    from pathlib import Path
+    Path(output_dir).mkdir(exist_ok=True)
+    
+    # Get current date (GPM has ~2 day latency)
+    today = datetime.now()
+    available_date = today - timedelta(days=3)
+    current_year = available_date.year
+    current_month = available_date.month
+    
+    print(f"Processing NRT data through {available_date.strftime('%Y-%m-%d')}")
+    
+    # Process GPM IMERG monthly data
+    ep = EffectivePrecipitation(
+        asset_id='NASA/GPM_L3/IMERG_MONTHLY_V06',
+        precip_band='precipitation',
+        geometry_path=geometry_path,
+        start_year=clim_start,
+        end_year=current_year,
+        scale=10000  # 10km resolution
+    )
+    
+    results = ep.process(output_dir=f'{output_dir}/monthly', n_workers=4)
+    
+    # Calculate anomaly for current month
+    stats = StatisticalAnalyzer(f'{output_dir}/monthly')
+    
+    anomaly = stats.calculate_anomaly(
+        year=current_year,
+        month=current_month,
+        clim_start=clim_start,
+        clim_end=clim_end,
+        anomaly_type='percent',
+        output_path=f'{output_dir}/current_anomaly.tif'
+    )
+    
+    # Generate visualization
+    viz = Visualizer(f'{output_dir}/monthly')
+    viz.plot_anomaly_map(
+        anomaly_path=f'{output_dir}/current_anomaly.tif',
+        title=f'Current Month Anomaly ({current_year}/{current_month:02d})',
+        output_path=f'{output_dir}/current_anomaly_map.png'
+    )
+    
+    # Return status
+    mean_anomaly = float(anomaly.mean())
+    return {
+        'date': f'{current_year}-{current_month:02d}',
+        'mean_anomaly_pct': mean_anomaly,
+        'status': 'Wet' if mean_anomaly > 110 else 'Dry' if mean_anomaly < 90 else 'Normal'
+    }
+
+# Run NRT monitoring
+status = near_realtime_monitoring(
+    geometry_path='study_area.geojson',
+    output_dir='./nrt_outputs'
+)
+print(f"\nCurrent Status: {status['status']} ({status['mean_anomaly_pct']:.1f}% of normal)")
+```
+
+---
+
+## Example 17: Multi-scale Analysis
+
+Compare effective precipitation across different spatial scales.
+
+**Python:**
+
+```python
+from pycropwat import EffectivePrecipitation
+from pycropwat.analysis import TemporalAggregator
+import pandas as pd
+from pathlib import Path
+
+def multiscale_analysis(
+    geometry_path: str,
+    scales: list = [1000, 5000, 10000, 30000],  # meters
+    year: int = 2023,
+    month: int = 6
+):
+    """
+    Analyze how effective precipitation varies with spatial resolution.
+    """
+    results = []
+    
+    for scale in scales:
+        print(f"Processing at {scale/1000:.0f} km resolution...")
+        
+        output_dir = f'./multiscale/scale_{scale}'
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        
+        ep = EffectivePrecipitation(
+            asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
+            precip_band='total_precipitation_sum',
+            geometry_path=geometry_path,
+            start_year=year,
+            end_year=year,
+            scale=scale,
+            precip_scale_factor=1000
+        )
+        
+        ep.process(output_dir=output_dir, months=[month])
+        
+        # Get statistics
+        agg = TemporalAggregator(output_dir)
+        import rioxarray
+        da = rioxarray.open_rasterio(agg._index[year][month]).squeeze('band', drop=True)
+        
+        results.append({
+            'scale_m': scale,
+            'scale_km': scale / 1000,
+            'mean_mm': float(da.mean()),
+            'std_mm': float(da.std()),
+            'min_mm': float(da.min()),
+            'max_mm': float(da.max()),
+            'cv_pct': float(da.std() / da.mean() * 100),
+            'n_pixels': da.size
+        })
+    
+    df = pd.DataFrame(results)
+    df.to_csv('./multiscale/scale_comparison.csv', index=False)
+    
+    # Plot
+    import matplotlib.pyplot as plt
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+    
+    axes[0].plot(df['scale_km'], df['mean_mm'], 'o-', linewidth=2, markersize=8)
+    axes[0].fill_between(df['scale_km'], 
+                         df['mean_mm'] - df['std_mm'],
+                         df['mean_mm'] + df['std_mm'], alpha=0.3)
+    axes[0].set_xlabel('Resolution (km)')
+    axes[0].set_ylabel('Mean Peff (mm)')
+    axes[0].set_title('Mean ± Std by Resolution')
+    
+    axes[1].plot(df['scale_km'], df['cv_pct'], 's-', color='orange', 
+                 linewidth=2, markersize=8)
+    axes[1].set_xlabel('Resolution (km)')
+    axes[1].set_ylabel('CV (%)')
+    axes[1].set_title('Coefficient of Variation')
+    
+    axes[2].plot(df['scale_km'], df['max_mm'] - df['min_mm'], '^-', 
+                 color='green', linewidth=2, markersize=8)
+    axes[2].set_xlabel('Resolution (km)')
+    axes[2].set_ylabel('Range (mm)')
+    axes[2].set_title('Max - Min Range')
+    
+    plt.suptitle(f'Multi-scale Analysis - {year}/{month:02d}', fontsize=14)
+    plt.tight_layout()
+    plt.savefig('./multiscale/scale_analysis.png', dpi=300, bbox_inches='tight')
+    
+    return df
+
+# Run analysis
+df = multiscale_analysis(
+    geometry_path='study_area.geojson',
+    scales=[1000, 2500, 5000, 10000, 25000],
+    year=2023,
+    month=6
+)
+print(df.to_string(index=False))
+```
+
+---
+
+## Example 18: Seasonal Forecast Verification
+
+Verify seasonal forecasts against observed effective precipitation.
+
+**Python:**
+
+```python
+from pycropwat.analysis import TemporalAggregator
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+def verify_seasonal_forecast(
+    observed_dir: str,
+    forecast_values: dict,  # {(year, season): forecast_mm}
+    seasons: list = ['DJF', 'MAM', 'JJA', 'SON']
+):
+    """
+    Verify seasonal forecasts against observed effective precipitation.
+    """
+    agg = TemporalAggregator(observed_dir)
+    
+    results = []
+    
+    for (year, season), forecast in forecast_values.items():
+        # Get observed seasonal total
+        observed_da = agg.seasonal_aggregate(year, season)
+        if observed_da is not None:
+            observed = float(observed_da.mean())
+            
+            # Calculate verification metrics
+            error = forecast - observed
+            abs_error = abs(error)
+            pct_error = (error / observed) * 100 if observed > 0 else np.nan
+            
+            results.append({
+                'year': year,
+                'season': season,
+                'forecast_mm': forecast,
+                'observed_mm': observed,
+                'error_mm': error,
+                'abs_error_mm': abs_error,
+                'pct_error': pct_error
+            })
+    
+    df = pd.DataFrame(results)
+    
+    # Calculate summary statistics
+    summary = {
+        'MAE': df['abs_error_mm'].mean(),
+        'RMSE': np.sqrt((df['error_mm'] ** 2).mean()),
+        'Bias': df['error_mm'].mean(),
+        'Correlation': df['forecast_mm'].corr(df['observed_mm'])
+    }
+    
+    # Create verification plot
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    
+    # Scatter plot
+    axes[0].scatter(df['observed_mm'], df['forecast_mm'], alpha=0.7)
+    max_val = max(df['observed_mm'].max(), df['forecast_mm'].max())
+    axes[0].plot([0, max_val], [0, max_val], 'k--', label='1:1 line')
+    axes[0].set_xlabel('Observed Peff (mm)')
+    axes[0].set_ylabel('Forecast Peff (mm)')
+    axes[0].set_title(f'Forecast Verification\nR={summary["Correlation"]:.3f}, Bias={summary["Bias"]:.1f} mm')
+    axes[0].legend()
+    
+    # Error distribution by season
+    season_errors = df.groupby('season')['error_mm'].mean()
+    colors = ['blue' if e < 0 else 'red' for e in season_errors]
+    axes[1].bar(season_errors.index, season_errors.values, color=colors)
+    axes[1].axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+    axes[1].set_ylabel('Mean Error (mm)')
+    axes[1].set_title('Mean Forecast Error by Season')
+    
+    plt.tight_layout()
+    plt.savefig('./forecast_verification.png', dpi=300, bbox_inches='tight')
+    
+    return df, summary
+
+# Example forecast data (would come from seasonal forecast model)
+forecasts = {
+    (2020, 'DJF'): 85, (2020, 'MAM'): 120, (2020, 'JJA'): 45, (2020, 'SON'): 95,
+    (2021, 'DJF'): 90, (2021, 'MAM'): 115, (2021, 'JJA'): 50, (2021, 'SON'): 100,
+    (2022, 'DJF'): 80, (2022, 'MAM'): 125, (2022, 'JJA'): 40, (2022, 'SON'): 90,
+    (2023, 'DJF'): 95, (2023, 'MAM'): 110, (2023, 'JJA'): 55, (2023, 'SON'): 105,
+}
+
+df, summary = verify_seasonal_forecast(
+    observed_dir='./outputs',
+    forecast_values=forecasts
+)
+
+print("\nVerification Summary:")
+for metric, value in summary.items():
+    print(f"  {metric}: {value:.2f}")
+```
+
+---
+
+## Example 19: Agricultural Water Balance
+
+Calculate a simple agricultural water balance using effective precipitation.
+
+**Python:**
+
+```python
+from pycropwat import EffectivePrecipitation
+from pycropwat.analysis import TemporalAggregator
+import numpy as np
+import xarray as xr
+import rioxarray
+import matplotlib.pyplot as plt
+from pathlib import Path
+
+def agricultural_water_balance(
+    peff_dir: str,
+    etc_dir: str,  # Directory with crop ET rasters
+    soil_water_capacity: float = 100,  # mm
+    initial_soil_water: float = 50,  # mm
+    output_dir: str = './water_balance'
+):
+    """
+    Simple bucket model water balance using Peff and ETc.
+    
+    Water balance: SW(t+1) = SW(t) + Peff - ETc - Runoff - Deep Percolation
+    """
+    Path(output_dir).mkdir(exist_ok=True)
+    
+    peff_agg = TemporalAggregator(peff_dir)
+    etc_agg = TemporalAggregator(etc_dir, pattern='etc_*.tif')
+    
+    years = sorted(peff_agg._index.keys())
+    
+    results = []
+    soil_water = initial_soil_water
+    
+    for year in years:
+        for month in range(1, 13):
+            if year not in peff_agg._index or month not in peff_agg._index[year]:
+                continue
+            if year not in etc_agg._index or month not in etc_agg._index[year]:
+                continue
+            
+            # Load data
+            peff = rioxarray.open_rasterio(peff_agg._index[year][month]).squeeze()
+            etc = rioxarray.open_rasterio(etc_agg._index[year][month]).squeeze()
+            
+            peff_mean = float(peff.mean())
+            etc_mean = float(etc.mean())
+            
+            # Water balance
+            potential_sw = soil_water + peff_mean
+            actual_et = min(etc_mean, potential_sw)  # Can't evaporate more than available
+            soil_water = potential_sw - actual_et
+            
+            # Runoff/deep percolation if exceeds capacity
+            excess = max(0, soil_water - soil_water_capacity)
+            soil_water = min(soil_water, soil_water_capacity)
+            
+            # Deficit
+            deficit = etc_mean - actual_et
+            
+            results.append({
+                'year': year,
+                'month': month,
+                'peff_mm': peff_mean,
+                'etc_mm': etc_mean,
+                'actual_et_mm': actual_et,
+                'soil_water_mm': soil_water,
+                'runoff_mm': excess,
+                'deficit_mm': deficit,
+                'stress_index': 1 - (actual_et / etc_mean) if etc_mean > 0 else 0
+            })
+    
+    import pandas as pd
+    df = pd.DataFrame(results)
+    df.to_csv(f'{output_dir}/water_balance.csv', index=False)
+    
+    # Create visualization
+    fig, axes = plt.subplots(3, 1, figsize=(14, 10), sharex=True)
+    
+    # Create datetime index
+    df['date'] = pd.to_datetime(df['year'].astype(str) + '-' + 
+                                df['month'].astype(str).str.zfill(2) + '-15')
+    
+    # Panel 1: Inputs
+    axes[0].bar(df['date'], df['peff_mm'], width=25, label='Peff', alpha=0.7)
+    axes[0].plot(df['date'], df['etc_mm'], 'r-', linewidth=2, label='ETc')
+    axes[0].set_ylabel('mm')
+    axes[0].set_title('Water Inputs and Demand')
+    axes[0].legend()
+    
+    # Panel 2: Soil water
+    axes[1].fill_between(df['date'], 0, df['soil_water_mm'], alpha=0.5, label='Soil Water')
+    axes[1].axhline(y=soil_water_capacity, color='red', linestyle='--', label='Field Capacity')
+    axes[1].set_ylabel('Soil Water (mm)')
+    axes[1].set_title('Soil Water Storage')
+    axes[1].legend()
+    
+    # Panel 3: Stress and runoff
+    ax3 = axes[2]
+    ax3.bar(df['date'], df['deficit_mm'], width=25, color='red', alpha=0.7, label='Deficit')
+    ax3.bar(df['date'], -df['runoff_mm'], width=25, color='blue', alpha=0.7, label='Excess/Runoff')
+    ax3.axhline(y=0, color='black', linewidth=0.5)
+    ax3.set_ylabel('mm')
+    ax3.set_xlabel('Date')
+    ax3.set_title('Water Deficit (-) and Excess (+)')
+    ax3.legend()
+    
+    plt.tight_layout()
+    plt.savefig(f'{output_dir}/water_balance_plot.png', dpi=300, bbox_inches='tight')
+    
+    return df
+
+# Usage (requires ETc rasters from a separate source)
+# df = agricultural_water_balance(
+#     peff_dir='./outputs',
+#     etc_dir='./crop_et',
+#     soil_water_capacity=150,
+#     initial_soil_water=75
+# )
+```
+
+---
+
+## Example 20: Integration with Other GEE Datasets
+
+Combine effective precipitation with other GEE datasets for comprehensive analysis.
+
+**Python:**
+
+```python
+import ee
+from pycropwat import EffectivePrecipitation
+from pycropwat.utils import initialize_gee, load_geometry
+import numpy as np
+import xarray as xr
+
+def integrated_water_assessment(
+    geometry_path: str,
+    year: int,
+    month: int,
+    gee_project: str = None
+):
+    """
+    Integrate Peff with NDVI, soil moisture, and land cover from GEE.
+    """
+    initialize_gee(gee_project)
+    geometry = load_geometry(geometry_path)
+    
+    # 1. Calculate effective precipitation (CROPWAT method)
+    print("Calculating effective precipitation...")
+    ep = EffectivePrecipitation(
+        asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
+        precip_band='total_precipitation_sum',
+        geometry_path=geometry_path,
+        start_year=year,
+        end_year=year,
+        precip_scale_factor=1000
+    )
+    ep.process(output_dir='./integrated', months=[month])
+    
+    # 2. Get NDVI from MODIS
+    print("Fetching NDVI...")
+    modis = (
+        ee.ImageCollection('MODIS/061/MOD13A2')
+        .filterDate(f'{year}-{month:02d}-01', f'{year}-{month:02d}-28')
+        .filterBounds(geometry)
+        .select('NDVI')
+        .mean()
+        .multiply(0.0001)  # Scale factor
+    )
+    
+    # 3. Get soil moisture from ERA5-Land
+    print("Fetching soil moisture...")
+    soil_moisture = (
+        ee.ImageCollection('ECMWF/ERA5_LAND/MONTHLY_AGGR')
+        .filterDate(f'{year}-{month:02d}-01', f'{year}-{month:02d}-28')
+        .filterBounds(geometry)
+        .select('volumetric_soil_water_layer_1')
+        .mean()
+    )
+    
+    # 4. Get land cover
+    print("Fetching land cover...")
+    landcover = (
+        ee.Image('COPERNICUS/Landcover/100m/Proba-V-C3/Global/2019')
+        .select('discrete_classification')
+        .clip(geometry)
+    )
+    
+    # 5. Sample and analyze by land cover type
+    print("Analyzing by land cover...")
+    scale = 10000  # 10km
+    
+    # Create sample points
+    sample = modis.addBands([soil_moisture, landcover]).sample(
+        region=geometry,
+        scale=scale,
+        numPixels=1000,
+        geometries=True
+    )
+    
+    # Get statistics
+    stats = sample.aggregate_stats('NDVI')
+    ndvi_mean = stats.get('mean').getInfo()
+    
+    print(f"\nIntegrated Assessment for {year}-{month:02d}:")
+    print(f"  Mean NDVI: {ndvi_mean:.3f}")
+    
+    # Land cover classes (ESA WorldCover)
+    lc_names = {
+        10: 'Tree cover',
+        20: 'Shrubland', 
+        30: 'Grassland',
+        40: 'Cropland',
+        50: 'Built-up',
+        60: 'Bare/sparse',
+        70: 'Snow/ice',
+        80: 'Water',
+        90: 'Herbaceous wetland',
+        100: 'Moss/lichen'
+    }
+    
+    return {
+        'year': year,
+        'month': month,
+        'ndvi_mean': ndvi_mean
+    }
+
+# Run integrated assessment
+# result = integrated_water_assessment(
+#     geometry_path='study_area.geojson',
+#     year=2023,
+#     month=6,
+#     gee_project='your-project-id'
+# )
+```
+
+---
+
+## Tips and Best Practices
+
+### Performance Optimization
+
+```python
+# Use appropriate number of workers based on your system
+import os
+n_cpus = os.cpu_count()
+n_workers = max(1, n_cpus - 2)  # Leave some cores free
+
+# For large regions, process in chunks
+ep.process(output_dir='./outputs', n_workers=n_workers)
+
+# For debugging, use sequential processing
+ep.process_sequential(output_dir='./outputs')
+```
+
+### Memory Management
+
+```python
+# Process year-by-year for very long time series
+for year in range(1980, 2024):
+    ep = EffectivePrecipitation(
+        asset_id='IDAHO_EPSCOR/TERRACLIMATE',
+        precip_band='pr',
+        geometry_path='large_region.geojson',
+        start_year=year,
+        end_year=year
+    )
+    ep.process(output_dir=f'./outputs/{year}')
+    del ep  # Free memory
+```
+
+### Error Handling
+
+```python
+from pycropwat import EffectivePrecipitation
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+try:
+    ep = EffectivePrecipitation(
+        asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
+        precip_band='total_precipitation_sum',
+        geometry_path='study_area.geojson',
+        start_year=2020,
+        end_year=2023,
+        precip_scale_factor=1000
+    )
+    results = ep.process(output_dir='./outputs', n_workers=4)
+    
+    # Check results
+    successful = sum(1 for r in results if r[0] is not None)
+    logger.info(f"Processed {successful}/{len(results)} months successfully")
+    
+except FileNotFoundError as e:
+    logger.error(f"Geometry file not found: {e}")
+except ValueError as e:
+    logger.error(f"Invalid parameters: {e}")
+except Exception as e:
+    logger.error(f"Processing failed: {e}")
+    raise
+```

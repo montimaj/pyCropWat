@@ -130,6 +130,54 @@ pycropwat process \
     --geometry roi.geojson \
     --start-year 2015 --end-year 2020 \
     --method dependable_rainfall --probability 0.8 --output ./output
+
+# FarmWest method
+pycropwat process \
+    --asset IDAHO_EPSCOR/TERRACLIMATE --band pr \
+    --geometry roi.geojson \
+    --start-year 2015 --end-year 2020 \
+    --method farmwest --output ./output
+```
+
+#### USDA-SCS Method (U.S. Data)
+
+The USDA-SCS method requires Available Water Capacity (AWC) and Reference Evapotranspiration (ETo) datasets:
+
+```bash
+# U.S. with SSURGO AWC and GridMET ETo
+pycropwat process \
+    --asset ECMWF/ERA5_LAND/MONTHLY_AGGR \
+    --band total_precipitation_sum \
+    --geometry arizona.geojson \
+    --start-year 2015 --end-year 2020 \
+    --scale-factor 1000 \
+    --method usda_scs \
+    --awc-asset projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite \
+    --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \
+    --rooting-depth 1.0 \
+    --output ./output_usda_scs
+```
+
+#### USDA-SCS Method (Global Data)
+
+For global applications, use FAO HWSD AWC and AgERA5 ETo:
+
+```bash
+# Global with FAO HWSD AWC and AgERA5 ETo (daily - requires aggregation)
+pycropwat process \
+    --asset ECMWF/ERA5_LAND/MONTHLY_AGGR \
+    --band total_precipitation_sum \
+    --geometry study_area.geojson \
+    --start-year 2015 --end-year 2020 \
+    --scale-factor 1000 \
+    --method usda_scs \
+    --awc-asset projects/sat-io/open-datasets/FAO/HWSD_V2_SMU \
+    --awc-band AWC \
+    --eto-asset projects/climate-engine-pro/assets/ce-ag-era5-v2/daily \
+    --eto-band ETo \
+    --eto-is-daily \
+    --rooting-depth 1.0 \
+    --output ./output_usda_scs_global
 ```
 
 ---
@@ -462,8 +510,38 @@ pycropwat plot annual-compare --input ./era5_output --other-input ./terraclimate
 <td>1</td>
 <td>~9 km</td>
 </tr>
+<tr>
+<td>GridMET</td>
+<td><code>IDAHO_EPSCOR/GRIDMET</code></td>
+<td><code>pr</code></td>
+<td>1</td>
+<td>~4 km (U.S. only)</td>
+</tr>
+<tr>
+<td>PRISM</td>
+<td><code>OREGONSTATE/PRISM/AN81m</code></td>
+<td><code>ppt</code></td>
+<td>1</td>
+<td>~4 km (U.S. only)</td>
+</tr>
 </tbody>
 </table>
+
+## AWC and ETo Assets for USDA-SCS Method
+
+### Available Water Capacity (AWC)
+
+| Region | Asset ID | Band | Units |
+|--------|----------|------|-------|
+| U.S. (SSURGO) | `projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite` | `AWC` | cm/cm |
+| Global (FAO HWSD) | `projects/sat-io/open-datasets/FAO/HWSD_V2_SMU` | `AWC` | cm/cm |
+
+### Reference Evapotranspiration (ETo)
+
+| Region | Asset ID | Band | Temporal |
+|--------|----------|------|----------|
+| U.S. (GridMET) | `projects/openet/assets/reference_et/conus/gridmet/monthly/v1` | `eto` | Monthly |
+| Global (AgERA5) | `projects/climate-engine-pro/assets/ce-ag-era5-v2/daily` | `ETo` | Daily (use `--eto-is-daily`) |
 
 ## Exit Codes
 

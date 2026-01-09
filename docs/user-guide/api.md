@@ -25,6 +25,55 @@ ep = EffectivePrecipitation(
 results = ep.process(output_dir='./outputs', n_workers=4)
 ```
 
+### Common Precipitation Datasets
+
+```python
+# ERA5-Land Monthly (~11 km global)
+ep_era5 = EffectivePrecipitation(
+    asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
+    precip_band='total_precipitation_sum',
+    geometry_path='study_area.geojson',
+    start_year=2020, end_year=2023,
+    precip_scale_factor=1000  # meters to mm
+)
+
+# TerraClimate (~4 km global)
+ep_terra = EffectivePrecipitation(
+    asset_id='IDAHO_EPSCOR/TERRACLIMATE',
+    precip_band='pr',
+    geometry_path='study_area.geojson',
+    start_year=2020, end_year=2023,
+    precip_scale_factor=1  # already in mm
+)
+
+# GridMET (~4 km U.S. only)
+ep_gridmet = EffectivePrecipitation(
+    asset_id='IDAHO_EPSCOR/GRIDMET',
+    precip_band='pr',
+    geometry_path='study_area.geojson',
+    start_year=2020, end_year=2023,
+    precip_scale_factor=1
+)
+
+# PRISM (~4 km U.S. only)
+ep_prism = EffectivePrecipitation(
+    asset_id='OREGONSTATE/PRISM/AN81m',
+    precip_band='ppt',
+    geometry_path='study_area.geojson',
+    start_year=2020, end_year=2023,
+    precip_scale_factor=1
+)
+
+# CHIRPS (~5.5 km global, 50°S-50°N)
+ep_chirps = EffectivePrecipitation(
+    asset_id='UCSB-CHG/CHIRPS/PENTAD',
+    precip_band='precipitation',
+    geometry_path='study_area.geojson',
+    start_year=2020, end_year=2023,
+    precip_scale_factor=1
+)
+```
+
 ### Using GEE Vector Asset
 
 ```python
@@ -79,9 +128,18 @@ from pycropwat.methods import (
     fixed_percentage_effective_precip,
     dependable_rainfall_effective_precip,
     farmwest_effective_precip,
-    usda_scs_effective_precip
+    usda_scs_effective_precip,
+    list_available_methods,
+    get_method_function
 )
 import numpy as np
+
+# List all available methods with descriptions
+for method, description in list_available_methods().items():
+    print(f"{method}: {description}")
+
+# Get a method function by name
+peff_func = get_method_function('cropwat')
 
 precip = np.array([50, 100, 200, 300, 400])
 
@@ -104,9 +162,54 @@ peff_farmwest = farmwest_effective_precip(precip)
 # [33.75  71.25  146.25  221.25  296.25]
 
 # USDA-SCS method (requires AWC and ETo arrays)
+# AWC is in volumetric fraction (cm/cm or inch/inch)
+# ETo is reference evapotranspiration in mm
 eto = np.array([80, 120, 180, 220, 260])  # mm
-awc = np.array([0.15, 0.15, 0.15, 0.15, 0.15])  # fraction
+awc = np.array([0.15, 0.15, 0.15, 0.15, 0.15])  # volumetric fraction
 peff_usda = usda_scs_effective_precip(precip, eto, awc, rooting_depth=1.0)
+```
+
+### Using USDA-SCS Method with GEE Assets
+
+The USDA-SCS method can be used with GEE assets for AWC and ETo:
+
+```python
+# For U.S. regions (SSURGO AWC + GridMET ETo)
+ep = EffectivePrecipitation(
+    asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
+    precip_band='total_precipitation_sum',
+    geometry_path='arizona.geojson',
+    start_year=2015,
+    end_year=2020,
+    precip_scale_factor=1000,
+    method='usda_scs',
+    method_params={
+        'awc_asset': 'projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite',
+        'awc_band': 'AWC',
+        'eto_asset': 'projects/openet/assets/reference_et/conus/gridmet/monthly/v1',
+        'eto_band': 'eto',
+        'rooting_depth': 1.0
+    }
+)
+
+# For global regions (FAO HWSD AWC + AgERA5 ETo)
+ep_global = EffectivePrecipitation(
+    asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
+    precip_band='total_precipitation_sum',
+    geometry_path='study_area.geojson',
+    start_year=2015,
+    end_year=2020,
+    precip_scale_factor=1000,
+    method='usda_scs',
+    method_params={
+        'awc_asset': 'projects/sat-io/open-datasets/FAO/HWSD_V2_SMU',
+        'awc_band': 'AWC',
+        'eto_asset': 'projects/climate-engine-pro/assets/ce-ag-era5-v2/daily',
+        'eto_band': 'ETo',
+        'eto_is_daily': True,  # Will aggregate daily to monthly
+        'rooting_depth': 1.0
+    }
+)
 ```
 
 ## Temporal Aggregation
@@ -151,7 +254,16 @@ custom = agg.custom_aggregate(
 )
 
 # Multi-year climatology (long-term average)
+# Note: climatology() is an alias for multi_year_climatology()
 climatology = agg.climatology(
+    start_year=1990,
+    end_year=2020,
+    method='mean',
+    output_dir='./climatology/'
+)
+
+# Or use the explicit method name
+climatology = agg.multi_year_climatology(
     start_year=1990,
     end_year=2020,
     method='mean',

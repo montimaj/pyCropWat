@@ -38,6 +38,19 @@ ep = EffectivePrecipitation(
 results = ep.process(output_dir='./outputs', n_workers=4)
 ```
 
+## Common Precipitation Datasets
+
+pyCropWat works with any monthly precipitation dataset in Google Earth Engine:
+
+| Dataset | Asset ID | Band | Scale Factor | Coverage |
+|---------|----------|------|--------------|----------|
+| ERA5-Land | `ECMWF/ERA5_LAND/MONTHLY_AGGR` | `total_precipitation_sum` | 1000 | Global (~11 km) |
+| TerraClimate | `IDAHO_EPSCOR/TERRACLIMATE` | `pr` | 1 | Global (~4 km) |
+| GridMET | `IDAHO_EPSCOR/GRIDMET` | `pr` | 1 | U.S. (~4 km) |
+| PRISM | `OREGONSTATE/PRISM/AN81m` | `ppt` | 1 | U.S. (~4 km) |
+| CHIRPS | `UCSB-CHG/CHIRPS/PENTAD` | `precipitation` | 1 | 50°S-50°N (~5.5 km) |
+| GPM IMERG | `NASA/GPM_L3/IMERG_MONTHLY_V06` | `precipitation` | 1 | Global (~10 km) |
+
 ## Using GEE Vector Assets
 
 You can use a GEE FeatureCollection asset instead of a local file:
@@ -70,7 +83,16 @@ ep = EffectivePrecipitation(
 
 ## Effective Precipitation Methods
 
-pyCropWat supports multiple methods for calculating effective precipitation:
+pyCropWat supports six methods for calculating effective precipitation:
+
+| Method | Formula | Use Case |
+|--------|---------|----------|
+| `cropwat` | P ≤ 250: Peff = P × (125 - 0.2P) / 125 <br> P > 250: Peff = 0.1P + 125 | Default FAO CROPWAT method |
+| `fao_aglw` | P ≤ 250: Peff = 0.6P - 10 <br> P > 250: Peff = 0.8P - 25 | FAO Land and Water Division |
+| `fixed_percentage` | Peff = P × percentage | Simple, adjustable (default 70%) |
+| `dependable_rainfall` | Probability-scaled FAO method | Conservative estimates |
+| `farmwest` | Peff = (P - 5) × 0.75 | Pacific Northwest irrigation |
+| `usda_scs` | Uses AWC, ETo, and soil storage | Site-specific with soil data |
 
 **CLI:**
 
@@ -94,6 +116,19 @@ pycropwat process --asset IDAHO_EPSCOR/TERRACLIMATE --band pr \
 pycropwat process --asset IDAHO_EPSCOR/TERRACLIMATE --band pr \
     --geometry roi.geojson --start-year 2020 --end-year 2023 \
     --method dependable_rainfall --probability 0.8 --output ./output
+
+# FarmWest method
+pycropwat process --asset IDAHO_EPSCOR/TERRACLIMATE --band pr \
+    --geometry roi.geojson --start-year 2020 --end-year 2023 \
+    --method farmwest --output ./output
+
+# USDA-SCS method (requires AWC and ETo assets)
+pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitation_sum \
+    --geometry roi.geojson --start-year 2020 --end-year 2023 \
+    --scale-factor 1000 --method usda_scs \
+    --awc-asset projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite \
+    --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \
+    --rooting-depth 1.0 --output ./output
 ```
 
 **Python:**
@@ -102,7 +137,8 @@ pycropwat process --asset IDAHO_EPSCOR/TERRACLIMATE --band pr \
 from pycropwat import EffectivePrecipitation
 from pycropwat.methods import (
     cropwat_effective_precip, fao_aglw_effective_precip,
-    fixed_percentage_effective_precip, dependable_rainfall_effective_precip
+    fixed_percentage_effective_precip, dependable_rainfall_effective_precip,
+    farmwest_effective_precip, usda_scs_effective_precip
 )
 
 # Using different methods with numpy arrays
@@ -113,6 +149,12 @@ peff_cropwat = cropwat_effective_precip(precip)
 peff_fao = fao_aglw_effective_precip(precip)
 peff_fixed = fixed_percentage_effective_precip(precip, percentage=0.8)
 peff_depend = dependable_rainfall_effective_precip(precip, probability=0.8)
+peff_farmwest = farmwest_effective_precip(precip)
+
+# USDA-SCS method requires ETo and AWC arrays
+eto = np.array([80, 120, 180, 220])  # mm
+awc = np.array([0.15, 0.15, 0.15, 0.15])  # volumetric fraction
+peff_usda = usda_scs_effective_precip(precip, eto, awc, rooting_depth=1.0)
 ```
 
 ## Processing Specific Months
