@@ -2,7 +2,7 @@
 
 All notable changes to pyCropWat will be documented in this file.
 
-## [Unreleased] - develop branch
+## [1.0.0] - 2026-01-08
 
 ### ✨ New Features
 
@@ -42,6 +42,10 @@ All notable changes to pyCropWat will be documented in this file.
 - Time series plots
 - Monthly climatology bar charts
 - Single raster map visualization
+- Anomaly maps with diverging colormaps (`plot_anomaly_map()`)
+- Climatology maps (`plot_climatology_map()`)
+- Trend maps with significance stippling (`plot_trend_map()`)
+- Trend panel with slope and p-value side by side (`plot_trend_panel()`)
 - Interactive maps using leafmap or folium (`plot_interactive_map()`)
 - Side-by-side dataset comparison with difference map (`plot_comparison()`)
 - Scatter plot comparison with R², RMSE, bias statistics (`plot_scatter_comparison()`)
@@ -72,6 +76,18 @@ All notable changes to pyCropWat will be documented in this file.
 - `--version` flag to display version
 - Legacy mode support for backwards compatibility
 
+### 📚 Documentation
+- Added comprehensive MkDocs documentation with GitHub Pages deployment
+- Added anomaly, climatology, and trend map visualization examples
+- Added Arizona USDA-SCS example comparing U.S. vs Global datasets
+- Added disk space requirements to installation guide
+- Fixed image paths for GitHub README rendering
+
+### 📁 Examples
+- **South America (Rio de la Plata)**: Complete workflow with ERA5-Land and TerraClimate comparison
+- **Arizona (USDA-SCS)**: U.S.-focused workflow with GridMET/PRISM precipitation, SSURGO AWC, and OpenET ETo
+- Added pre-computed example outputs for both regions
+
 ### 📦 New Dependencies
 - `scipy>=1.9.0` - Statistical functions
 - `matplotlib>=3.5.0` - Visualization
@@ -85,38 +101,8 @@ All notable changes to pyCropWat will be documented in this file.
 ### 📁 New Files
 - `pycropwat/methods.py` - Effective precipitation calculation methods
 - `pycropwat/analysis.py` - Temporal aggregation, statistics, visualization
-
----
-
-## [1.0.0] - 2026-01-08
-
-### 🎉 Initial Release
-
-pyCropWat is a Python package for calculating CROPWAT effective precipitation from Google Earth Engine (GEE) climate data using the USDA SCS method as implemented in FAO CROPWAT.
-
-### ✨ Features
-
-- **Multiple GEE Dataset Support**: Works with ERA5-Land, TerraClimate, CHIRPS, GPM IMERG, AgERA5, and any GEE dataset with precipitation bands
-- **Flexible Geometry Inputs**: Accepts Shapefiles, GeoJSON, or GEE FeatureCollection assets
-- **Automatic Chunked Downloads**: Handles large regions exceeding GEE pixel limits with intelligent tiling (256×256 pixels)
-- **Parallel Processing**: Leverages Dask for efficient multi-month/multi-year processing
-- **Dual Interface**: Full-featured CLI and Python API for seamless integration
-- **Output Products**:
-  - Monthly effective precipitation rasters (GeoTIFF)
-  - Effective precipitation fraction (ratio of effective to total)
-
-### 📦 Installation
-
-```bash
-pip install pycropwat
-```
-
-Or with conda:
-
-```bash
-conda env create -f environment.yml
-conda activate pycropwat
-```
+- `Examples/arizona_usda_scs_example.py` - Arizona USDA-SCS workflow
+- `Examples/south_america_cropwat_example.py` - Rio de la Plata CROPWAT workflow
 
 ### 🚀 Quick Start
 
