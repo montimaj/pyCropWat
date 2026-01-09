@@ -325,7 +325,7 @@ def usda_scs_effective_precip(
     
     awc : np.ndarray
         Available Water Capacity in inches/inch (volumetric fraction).
-        For SSURGO data, this is typically in units of cm/cm.
+        For gNATSGO data and FAO data, this is typically in units of mm/m.
     
     rooting_depth : float, optional
         Crop rooting depth in meters. Default is 1.0 m.
