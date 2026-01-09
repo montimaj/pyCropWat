@@ -265,8 +265,18 @@ def run_temporal_aggregation(dataset_name: str):
     
     Creates:
     - Annual totals
-    - Seasonal aggregations
+    - Growing season aggregations (April-September)
     - Monthly climatology
+    
+    Parameters
+    ----------
+    dataset_name : str
+        Name of the dataset ('ERA5Land' or 'TerraClimate').
+        
+    Returns
+    -------
+    TemporalAggregator
+        The aggregator instance used for the dataset.
     """
     config = DATASETS[dataset_name]
     input_dir = Path(config['output_dir'])
@@ -334,6 +344,16 @@ def run_statistical_analysis(dataset_name: str):
     """
     Run statistical analysis for a dataset.
     
+    Parameters
+    ----------
+    dataset_name : str
+        Name of the dataset ('ERA5Land' or 'TerraClimate').
+        
+    Returns
+    -------
+    StatisticalAnalyzer
+        The analyzer instance used for the dataset.
+        
     Computes:
     - Anomalies for recent years
     - Long-term trends
@@ -410,7 +430,23 @@ def run_statistical_analysis(dataset_name: str):
 
 
 def create_zonal_summary_plot(zonal_df, dataset_name: str, output_dir: Path):
-    """Create summary plots for zonal statistics."""
+    """
+    Create summary plots for zonal statistics.
+    
+    Generates a figure with two panels:
+    - Time series of mean effective precipitation by zone
+    - Monthly climatology bar chart by zone
+    
+    Parameters
+    ----------
+    zonal_df : pandas.DataFrame
+        DataFrame containing zonal statistics with columns:
+        zone_id, year, month, mean, etc.
+    dataset_name : str
+        Name of the dataset for plot titles.
+    output_dir : Path
+        Directory to save the output plot.
+    """
     import matplotlib.pyplot as plt
     import pandas as pd
     
@@ -480,8 +516,18 @@ def run_visualization(dataset_name: str):
     Creates:
     - Time series plots
     - Monthly climatology bar charts
-    - Static raster maps (multiple months)
-    - Interactive maps (multiple months)
+    - Static raster maps (wet/dry seasons, notable events)
+    - Interactive HTML maps
+    
+    Parameters
+    ----------
+    dataset_name : str
+        Name of the dataset ('ERA5Land' or 'TerraClimate').
+        
+    Returns
+    -------
+    Visualizer
+        The visualizer instance used for the dataset.
     """
     config = DATASETS[dataset_name]
     input_dir = Path(config['output_dir'])
@@ -584,7 +630,13 @@ def plot_anomaly_maps(dataset_name: str):
     """
     Create anomaly map visualizations for a dataset using Visualizer class.
     
-    Plots percent anomalies for selected months using a diverging colormap.
+    Plots percent anomalies for selected months using a diverging colormap,
+    including notable climate events (El Niño, La Niña).
+    
+    Parameters
+    ----------
+    dataset_name : str
+        Name of the dataset ('ERA5Land' or 'TerraClimate').
     """
     config = DATASETS[dataset_name]
     input_dir = Path(config['output_dir'])
@@ -626,9 +678,15 @@ def plot_anomaly_maps(dataset_name: str):
 
 def plot_climatology_maps(dataset_name: str):
     """
-    Create monthly climatology map visualizations for a dataset using Visualizer class.
+    Create monthly climatology map visualizations for a dataset.
     
-    Plots climatology maps for selected months (e.g., typical wet/dry season months).
+    Plots long-term mean effective precipitation for key months representing
+    different seasons (Southern Hemisphere: Jan=summer, Jun=winter).
+    
+    Parameters
+    ----------
+    dataset_name : str
+        Name of the dataset ('ERA5Land' or 'TerraClimate').
     """
     config = DATASETS[dataset_name]
     input_dir = Path(config['output_dir'])
@@ -675,11 +733,16 @@ def plot_climatology_maps(dataset_name: str):
 
 def plot_trend_maps(dataset_name: str):
     """
-    Create trend map visualizations for a dataset using Visualizer class.
+    Create trend map visualizations for a dataset.
     
-    Plots:
+    Plots Sen's slope (mm/year) with Mann-Kendall significance testing:
     - Combined slope and p-value panel
-    - Slope map with significance overlay
+    - Slope map with significance stippling overlay
+    
+    Parameters
+    ----------
+    dataset_name : str
+        Name of the dataset ('ERA5Land' or 'TerraClimate').
     """
     config = DATASETS[dataset_name]
     input_dir = Path(config['output_dir'])
@@ -743,9 +806,10 @@ def compare_datasets():
     Compare ERA5-Land and TerraClimate effective precipitation.
     
     Creates:
-    - Side-by-side comparison plots
-    - Scatter comparison plots
-    - Annual comparison bar charts
+    - Side-by-side spatial comparison plots
+    - Scatter plot showing pixel-by-pixel correlation
+    - Annual mean time series comparison
+    - Zonal statistics comparison
     """
     logger.info("Comparing ERA5-Land and TerraClimate datasets...")
     
@@ -817,8 +881,11 @@ def compare_zonal_statistics():
     """
     Compare zonal statistics between ERA5-Land and TerraClimate.
     
-    Creates comparison plots showing how the two datasets differ
-    across the Eastern and Western RDP zones.
+    Creates a 2x2 comparison figure showing:
+    - Annual time series for Eastern RDP
+    - Annual time series for Western RDP
+    - Monthly climatology for Eastern RDP
+    - Monthly climatology for Western RDP
     """
     import matplotlib.pyplot as plt
     import pandas as pd
@@ -998,8 +1065,20 @@ def compare_methods_for_month(
     """
     Compare effective precipitation methods for a specific month.
     
-    Creates a 2x2 plot showing the spatial distribution of Peff
-    calculated by each method.
+    Creates a 2x3 plot showing the spatial distribution of effective
+    precipitation calculated by each of the six methods.
+    
+    Parameters
+    ----------
+    dataset_name : str
+        Name of the dataset ('ERA5Land' or 'TerraClimate').
+    year : int
+        Year to analyze.
+    month : int
+        Month to analyze (1-12).
+    method_info : dict
+        Dictionary with method names as keys and sub-dicts containing
+        'name' (display name) and 'color' for plotting.
     """
     import matplotlib.pyplot as plt
     import rioxarray
@@ -1108,9 +1187,19 @@ def compare_methods_for_month(
 
 def plot_method_curves(dataset_name: str, method_info: dict):
     """
-    Plot theoretical Peff curves for each method.
+    Plot theoretical effective precipitation curves for each method.
     
-    Shows how each method transforms precipitation to effective precipitation.
+    Creates a two-panel figure showing:
+    - Peff vs P curves for all methods
+    - Efficiency ratio (Peff/P) vs P for all methods
+    
+    Parameters
+    ----------
+    dataset_name : str
+        Name of the dataset (used for plot titles).
+    method_info : dict
+        Dictionary with method names as keys and sub-dicts containing
+        'name' (display name) and 'color' for plotting.
     """
     import matplotlib.pyplot as plt
     import numpy as np
@@ -1192,7 +1281,14 @@ def compare_methods_across_datasets(method_info: dict):
     """
     Create summary comparison of methods across both datasets.
     
-    Shows how method choice affects the results for each dataset.
+    Samples multiple months from both ERA5-Land and TerraClimate to compute
+    statistics showing how method choice affects results for each dataset.
+    
+    Parameters
+    ----------
+    method_info : dict
+        Dictionary with method names as keys and sub-dicts containing
+        'name' (display name) and 'color' for plotting.
     """
     import matplotlib.pyplot as plt
     import pandas as pd
@@ -1370,7 +1466,17 @@ def compare_methods_across_datasets(method_info: dict):
 # =============================================================================
 
 def export_netcdf(dataset_name: str):
-    """Export dataset to NetCDF format."""
+    """
+    Export dataset to NetCDF format.
+    
+    Combines all monthly effective precipitation rasters into a single
+    NetCDF file with CF-compliant metadata.
+    
+    Parameters
+    ----------
+    dataset_name : str
+        Name of the dataset ('ERA5Land' or 'TerraClimate').
+    """
     config = DATASETS[dataset_name]
     input_dir = Path(config['output_dir'])
     output_file = ANALYSIS_DIR / f'{dataset_name}_effective_precip_{START_YEAR}_{END_YEAR}.nc'

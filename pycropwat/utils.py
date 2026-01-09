@@ -1,8 +1,46 @@
 """
 Utility functions for pyCropWat package.
+
+This module provides utility functions for working with Google Earth Engine,
+loading geometries from various sources, and managing date ranges.
+
+Functions
+---------
+initialize_gee
+    Initialize Google Earth Engine with optional project ID.
+    
+load_geometry
+    Load geometry from local file (shapefile/GeoJSON) or GEE asset.
+    
+load_geometry_from_file
+    Load geometry from local shapefile or GeoJSON file.
+    
+load_geometry_from_gee_asset
+    Load geometry from GEE FeatureCollection asset.
+    
+is_gee_asset
+    Check if a path string represents a GEE asset.
+    
+get_date_range
+    Generate date range strings for GEE filtering.
+    
+get_monthly_dates
+    Generate list of (year, month) tuples for iteration.
+
+Example
+-------
+>>> from pycropwat.utils import initialize_gee, load_geometry
+>>> 
+>>> # Initialize GEE with project
+>>> initialize_gee(project='my-gee-project')
+>>> 
+>>> # Load geometry from local file
+>>> geom = load_geometry('study_area.geojson')
+>>> 
+>>> # Load geometry from GEE asset
+>>> geom = load_geometry(gee_asset='projects/my-project/assets/boundary')
 """
 
-import json
 from pathlib import Path
 from typing import Union, Tuple, List, Optional
 import ee

@@ -1,5 +1,37 @@
 """
 Core module for effective precipitation calculations using Google Earth Engine.
+
+This module provides the main :class:`EffectivePrecipitation` class for calculating
+effective precipitation from various climate datasets available on Google Earth Engine.
+
+The module supports multiple effective precipitation methods:
+
+- **CROPWAT**: USDA SCS/CROPWAT method (FAO standard)
+- **FAO/AGLW**: FAO Land and Water Division formula
+- **Fixed Percentage**: Simple fixed percentage method
+- **Dependable Rainfall**: FAO Dependable Rainfall method
+- **FarmWest**: Washington State University FarmWest method
+- **USDA-SCS**: Soil moisture depletion method (requires AWC and ETo)
+
+Example
+-------
+>>> from pycropwat import EffectivePrecipitation
+>>> ep = EffectivePrecipitation(
+...     asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
+...     precip_band='total_precipitation_sum',
+...     geometry_path='study_area.geojson',
+...     start_year=2015,
+...     end_year=2020,
+...     precip_scale_factor=1000,
+...     method='cropwat'
+... )
+>>> results = ep.process(output_dir='./output', n_workers=4)
+
+See Also
+--------
+pycropwat.methods : Individual effective precipitation calculation functions.
+pycropwat.analysis : Post-processing and analysis tools.
+pycropwat.utils : Utility functions for GEE and file operations.
 """
 
 import logging
@@ -17,10 +49,6 @@ from dask.diagnostics import ProgressBar
 
 from .utils import load_geometry, get_date_range, get_monthly_dates, initialize_gee
 from .methods import (
-    cropwat_effective_precip,
-    fao_aglw_effective_precip,
-    fixed_percentage_effective_precip,
-    dependable_rainfall_effective_precip,
     get_method_function,
     PeffMethod
 )
@@ -33,18 +61,35 @@ MAX_PIXELS_PER_TILE = 65536  # 256 x 256
 
 class EffectivePrecipitation:
     """
-    Calculate CROPWAT effective precipitation from GEE climate data.
+    Calculate effective precipitation from GEE climate data.
     
-    The CROPWAT effective precipitation formula:
-    - If pr <= 250mm: ep = pr * (125 - 0.2 * pr) / 125
-    - If pr > 250mm: ep = 0.1 * pr + 125
+    Supports multiple effective precipitation calculation methods including
+    CROPWAT, FAO/AGLW, Fixed Percentage, Dependable Rainfall, FarmWest,
+    and USDA-SCS (which requires AWC and ETo data).
     
     Parameters
     ----------
     asset_id : str
-        GEE ImageCollection asset ID (e.g., 'ECMWF/ERA5_LAND/MONTHLY_AGGR').
+        GEE ImageCollection asset ID for precipitation data.
+        Common options include:
+        
+        - ``'ECMWF/ERA5_LAND/MONTHLY_AGGR'`` - ERA5-Land (global, ~11km)
+        - ``'IDAHO_EPSCOR/TERRACLIMATE'`` - TerraClimate (global, ~4km)
+        - ``'IDAHO_EPSCOR/GRIDMET'`` - GridMET (CONUS, ~4km)
+        - ``'OREGONSTATE/PRISM/AN81m'`` - PRISM (CONUS, ~4km)
+        - ``'UCSB-CHG/CHIRPS/DAILY'`` - CHIRPS (50°S-50°N, ~5km)
+        - ``'NASA/GPM_L3/IMERG_MONTHLY_V06'`` - GPM IMERG (global, ~11km)
+        
     precip_band : str
-        Name of the precipitation band in the asset.
+        Name of the precipitation band in the asset. Examples:
+        
+        - ERA5-Land: ``'total_precipitation_sum'``
+        - TerraClimate: ``'pr'``
+        - GridMET: ``'pr'``
+        - PRISM: ``'ppt'``
+        - CHIRPS: ``'precipitation'``
+        - GPM IMERG: ``'precipitation'``
+        
     geometry_path : str, Path, or None
         Path to shapefile or GeoJSON file defining the region of interest.
         Can also be a GEE FeatureCollection asset ID. Set to None if using
@@ -54,19 +99,65 @@ class EffectivePrecipitation:
     end_year : int
         End year for processing (inclusive).
     scale : float, optional
-        Output resolution in meters. Default is native resolution (None).
+        Output resolution in meters. If None (default), uses native resolution
+        of the dataset.
     precip_scale_factor : float, optional
-        Factor to convert precipitation to mm. Default is 1000 (for ERA5 m to mm).
+        Factor to convert precipitation to mm. Default is 1.0.
+        Common values:
+        
+        - ERA5-Land (m to mm): 1000
+        - TerraClimate (already mm): 1.0
+        - GridMET (already mm): 1.0
+        
     gee_project : str, optional
-        GEE project ID for authentication.
+        GEE project ID for authentication. Required for cloud-based GEE access.
     gee_geometry_asset : str, optional
         GEE FeatureCollection asset ID for the region of interest.
         Takes precedence over geometry_path if both are provided.
+    method : str, optional
+        Effective precipitation calculation method. Default is 'cropwat'.
+        Options:
+        
+        - ``'cropwat'`` - USDA SCS/CROPWAT method (FAO standard)
+        - ``'fao_aglw'`` - FAO Land and Water Division formula
+        - ``'fixed_percentage'`` - Simple fixed percentage method
+        - ``'dependable_rainfall'`` - FAO Dependable Rainfall method
+        - ``'farmwest'`` - Washington State University FarmWest method
+        - ``'usda_scs'`` - USDA-SCS soil moisture depletion method
+          (requires AWC and ETo data via method_params)
+          
+    method_params : dict, optional
+        Additional parameters for the selected method:
+        
+        For ``'fixed_percentage'``:
+            - ``percentage`` (float): Fraction 0-1. Default 0.7.
+            
+        For ``'dependable_rainfall'``:
+            - ``probability`` (float): Probability level 0.5-0.9. Default 0.75.
+            
+        For ``'usda_scs'``:
+            - ``awc_asset`` (str): GEE Image asset ID for AWC data. Required.
+            - ``awc_band`` (str): Band name for AWC. Default 'AWC'.
+            - ``eto_asset`` (str): GEE ImageCollection asset ID for ETo. Required.
+            - ``eto_band`` (str): Band name for ETo. Default 'eto'.
+            - ``eto_is_daily`` (bool): Whether ETo is daily. Default False.
+            - ``eto_scale_factor`` (float): Scale factor for ETo. Default 1.0.
+            - ``rooting_depth`` (float): Rooting depth in meters. Default 1.0.
+        
+    Attributes
+    ----------
+    geometry : ee.Geometry
+        The loaded geometry for the region of interest.
+    collection : ee.ImageCollection
+        The filtered and scaled precipitation image collection.
+    bounds : list
+        Bounding box coordinates of the geometry.
         
     Examples
     --------
+    Basic usage with CROPWAT method (default):
+    
     >>> from pycropwat import EffectivePrecipitation
-    >>> # Using local file
     >>> ep = EffectivePrecipitation(
     ...     asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
     ...     precip_band='total_precipitation_sum',
@@ -75,17 +166,67 @@ class EffectivePrecipitation:
     ...     end_year=2020,
     ...     precip_scale_factor=1000
     ... )
-    >>> 
-    >>> # Using GEE FeatureCollection asset
+    >>> ep.process(output_dir='./output', n_workers=4)
+    
+    Using GEE FeatureCollection asset:
+    
     >>> ep = EffectivePrecipitation(
     ...     asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
     ...     precip_band='total_precipitation_sum',
     ...     gee_geometry_asset='projects/my-project/assets/study_area',
     ...     start_year=2015,
     ...     end_year=2020,
-    ...     precip_scale_factor=1000
+    ...     precip_scale_factor=1000,
+    ...     gee_project='my-gee-project'
     ... )
-    >>> ep.process(output_dir='./output', n_workers=4)
+    
+    Using FAO/AGLW method:
+    
+    >>> ep = EffectivePrecipitation(
+    ...     asset_id='IDAHO_EPSCOR/TERRACLIMATE',
+    ...     precip_band='pr',
+    ...     geometry_path='study_area.geojson',
+    ...     start_year=2000,
+    ...     end_year=2020,
+    ...     method='fao_aglw'
+    ... )
+    
+    Using fixed percentage method (80%):
+    
+    >>> ep = EffectivePrecipitation(
+    ...     asset_id='IDAHO_EPSCOR/GRIDMET',
+    ...     precip_band='pr',
+    ...     geometry_path='farm.geojson',
+    ...     start_year=2010,
+    ...     end_year=2020,
+    ...     method='fixed_percentage',
+    ...     method_params={'percentage': 0.8}
+    ... )
+    
+    Using USDA-SCS method with AWC and ETo data:
+    
+    >>> ep = EffectivePrecipitation(
+    ...     asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
+    ...     precip_band='total_precipitation_sum',
+    ...     geometry_path='arizona.geojson',
+    ...     start_year=2015,
+    ...     end_year=2020,
+    ...     precip_scale_factor=1000,
+    ...     method='usda_scs',
+    ...     method_params={
+    ...         'awc_asset': 'projects/my-project/assets/soil_awc',
+    ...         'awc_band': 'AWC',
+    ...         'eto_asset': 'IDAHO_EPSCOR/GRIDMET',
+    ...         'eto_band': 'eto',
+    ...         'eto_is_daily': True,
+    ...         'rooting_depth': 1.0
+    ...     }
+    ... )
+    
+    See Also
+    --------
+    pycropwat.methods : Individual effective precipitation calculation functions.
+    pycropwat.analysis : Post-processing and analysis tools.
     """
     
     def __init__(
@@ -525,15 +666,35 @@ class EffectivePrecipitation:
         """
         Load Available Water Capacity (AWC) data for USDA-SCS method.
         
+        Downloads AWC data from a GEE Image asset and resamples it to match
+        the template DataArray's spatial extent and resolution. Results are
+        cached for efficiency across multiple months.
+        
         Parameters
         ----------
         template_da : xr.DataArray
             Template DataArray to match spatial extent and resolution.
+            Typically a precipitation DataArray from the same month.
             
         Returns
         -------
         np.ndarray
-            AWC values resampled to match template grid.
+            AWC values (fraction, 0-1) resampled to match template grid.
+            
+        Notes
+        -----
+        AWC data is loaded from the GEE asset specified in ``method_params['awc_asset']``.
+        If loading fails, a default value of 0.15 (15% AWC) is used.
+        
+        The AWC data is cached after first load to avoid repeated downloads
+        for subsequent months.
+        
+        If ``save_inputs`` is True during processing, the AWC data is saved
+        as ``awc.tif`` in the input directory.
+        
+        See Also
+        --------
+        _load_monthly_eto : Load reference evapotranspiration data.
         """
         if self._awc_cache is not None:
             return self._awc_cache
@@ -625,19 +786,43 @@ class EffectivePrecipitation:
         """
         Load Reference Evapotranspiration (ETo) data for USDA-SCS method.
         
+        Downloads ETo data from a GEE ImageCollection and aggregates to monthly
+        totals. The data is resampled to match the template DataArray's spatial
+        extent and resolution.
+        
         Parameters
         ----------
         year : int
-            Year.
+            Year to load.
         month : int
-            Month (1-12).
+            Month to load (1-12).
         template_da : xr.DataArray
             Template DataArray to match spatial extent and resolution.
+            Typically a precipitation DataArray from the same month.
             
         Returns
         -------
         np.ndarray
-            Monthly ETo values in mm.
+            Monthly ETo values in mm, resampled to match template grid.
+            
+        Notes
+        -----
+        ETo data is loaded from the GEE asset specified in ``method_params['eto_asset']``.
+        
+        If ``method_params['eto_is_daily']`` is True, daily values are summed
+        to monthly totals. Otherwise, the first image in the month is used.
+        
+        A scale factor can be applied via ``method_params['eto_scale_factor']``
+        for unit conversion (e.g., 0.1 if ETo is stored in 0.1 mm units).
+        
+        If loading fails, a default value of 100 mm/month is used.
+        
+        If ``save_inputs`` is True during processing, the ETo data is saved
+        as ``eto_YYYY_MM.tif`` in the input directory.
+        
+        See Also
+        --------
+        _load_awc_data : Load available water capacity data.
         """
         eto_asset = self.method_params.get('eto_asset')
         eto_band = self.method_params.get('eto_band', 'eto')
@@ -973,26 +1158,71 @@ class EffectivePrecipitation:
         """
         Process all months and save effective precipitation rasters.
         
-        Uses dask for parallel processing of multiple months.
+        Downloads precipitation data from Google Earth Engine, calculates
+        effective precipitation using the configured method, and saves
+        results as GeoTIFF files. Uses Dask for parallel processing of
+        multiple months.
         
         Parameters
         ----------
         output_dir : str or Path
-            Directory to save output rasters.
+            Directory to save output rasters. Will be created if it
+            doesn't exist.
         n_workers : int, optional
-            Number of parallel workers for dask. Default is 4.
+            Number of parallel workers for Dask. Default is 4.
+            Set to 1 for sequential processing.
         months : list of int, optional
-            List of months to process (1-12). If None, processes all months.
+            List of months to process (1-12). If None, processes all months
+            in the date range. Useful for seasonal analyses.
         input_dir : str or Path, optional
             Directory to save downloaded input data (precipitation, AWC, ETo).
-            If None and save_inputs is True, uses output_dir/../analysis_inputs.
+            If None and save_inputs is True, uses ``output_dir/../analysis_inputs``.
         save_inputs : bool, optional
-            Whether to save downloaded input data. Default is False.
+            Whether to save downloaded input data as GeoTIFF files.
+            Default is False. Useful for debugging or further analysis.
             
         Returns
         -------
-        list
-            List of tuples containing paths to saved files (ep_path, epf_path).
+        list of tuple
+            List of tuples containing paths to saved files:
+            ``(effective_precip_path, effective_precip_fraction_path)``.
+            Returns ``(None, None)`` for months that failed to process.
+            
+        Notes
+        -----
+        Output files are named:
+        
+        - ``effective_precip_YYYY_MM.tif`` - Effective precipitation in mm
+        - ``effective_precip_fraction_YYYY_MM.tif`` - Effective/total ratio
+        
+        For the USDA-SCS method, AWC and ETo data are automatically downloaded
+        and cached for efficiency.
+        
+        Examples
+        --------
+        Process all months in parallel:
+        
+        >>> ep = EffectivePrecipitation(...)
+        >>> results = ep.process(output_dir='./output', n_workers=8)
+        
+        Process only summer months:
+        
+        >>> results = ep.process(
+        ...     output_dir='./output',
+        ...     months=[6, 7, 8]  # June, July, August
+        ... )
+        
+        Save input data for debugging:
+        
+        >>> results = ep.process(
+        ...     output_dir='./output',
+        ...     save_inputs=True,
+        ...     input_dir='./inputs'
+        ... )
+        
+        See Also
+        --------
+        process_sequential : Sequential processing for debugging.
         """
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -1039,22 +1269,43 @@ class EffectivePrecipitation:
         """
         Process all months sequentially (useful for debugging).
         
+        Same as :meth:`process` but without parallel processing. Useful for
+        debugging issues, testing on small datasets, or when GEE rate limits
+        are a concern.
+        
         Parameters
         ----------
         output_dir : str or Path
-            Directory to save output rasters.
+            Directory to save output rasters. Will be created if it
+            doesn't exist.
         months : list of int, optional
-            List of months to process (1-12). If None, processes all months.
+            List of months to process (1-12). If None, processes all months
+            in the date range.
         input_dir : str or Path, optional
             Directory to save downloaded input data (precipitation, AWC, ETo).
-            If None and save_inputs is True, uses output_dir/../analysis_inputs.
+            If None and save_inputs is True, uses ``output_dir/../analysis_inputs``.
         save_inputs : bool, optional
             Whether to save downloaded input data. Default is False.
             
         Returns
         -------
-        list
-            List of tuples containing paths to saved files (ep_path, epf_path).
+        list of tuple
+            List of tuples containing paths to saved files:
+            ``(effective_precip_path, effective_precip_fraction_path)``.
+            Returns ``(None, None)`` for months that failed to process.
+            
+        Examples
+        --------
+        >>> ep = EffectivePrecipitation(...)
+        >>> # Debug a single month
+        >>> results = ep.process_sequential(
+        ...     output_dir='./output',
+        ...     months=[1]  # Process only January
+        ... )
+        
+        See Also
+        --------
+        process : Parallel processing method (recommended for production).
         """
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)

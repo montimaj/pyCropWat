@@ -1,8 +1,63 @@
 """
 Analysis module for temporal aggregation, statistics, and visualization.
 
-This module provides functions for post-processing effective precipitation
-data including temporal aggregation, statistical analysis, and visualization.
+This module provides comprehensive tools for post-processing effective precipitation
+data, including temporal aggregation, statistical analysis, and visualization.
+
+Classes
+-------
+TemporalAggregator
+    Aggregate effective precipitation rasters over time periods (seasonal,
+    annual, growing season, custom date ranges).
+    
+StatisticalAnalyzer
+    Calculate statistics, trends, anomalies, and spatial summaries from
+    effective precipitation time series.
+    
+Visualizer
+    Create publication-quality maps, time series plots, and comparison
+    visualizations.
+
+Functions
+---------
+export_to_netcdf
+    Export raster data to NetCDF format with CF-compliant metadata.
+    
+export_to_cog
+    Export raster data to Cloud-Optimized GeoTIFF format.
+
+Example
+-------
+>>> from pycropwat.analysis import (
+...     TemporalAggregator,
+...     StatisticalAnalyzer,
+...     Visualizer
+... )
+>>> 
+>>> # Temporal aggregation
+>>> agg = TemporalAggregator('./output')
+>>> annual = agg.annual_aggregate(2020, method='sum')
+>>> seasonal = agg.seasonal_aggregate(2020, 'JJA')
+>>> 
+>>> # Statistical analysis
+>>> stats = StatisticalAnalyzer('./output')
+>>> trend = stats.calculate_trend(2010, 2020)
+>>> anomaly = stats.calculate_anomaly(2020)
+>>> 
+>>> # Visualization
+>>> viz = Visualizer()
+>>> viz.plot_map(annual, title='Annual Effective Precipitation 2020')
+>>> viz.plot_time_series(stats.get_time_series(2010, 2020))
+
+Notes
+-----
+All raster operations preserve geospatial metadata (CRS, transform) and
+support both in-memory and file-based workflows.
+
+See Also
+--------
+pycropwat.core : Core effective precipitation calculations.
+pycropwat.methods : Effective precipitation calculation methods.
 """
 
 import logging
@@ -12,7 +67,7 @@ from typing import Union, Optional, List, Tuple, Literal
 import numpy as np
 import xarray as xr
 import rioxarray
-from glob import glob
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -728,7 +783,7 @@ class StatisticalAnalyzer:
         months: Optional[List[int]] = None,
         stats: List[str] = ['mean', 'sum', 'min', 'max', 'std'],
         output_path: Optional[Union[str, Path]] = None
-    ) -> 'pd.DataFrame':
+    ) -> pd.DataFrame:
         """
         Calculate zonal statistics for polygons.
         
@@ -753,7 +808,6 @@ class StatisticalAnalyzer:
             DataFrame with zonal statistics.
         """
         import geopandas as gpd
-        import pandas as pd
         from rasterstats import zonal_stats
         
         gdf = gpd.read_file(geometry_path)

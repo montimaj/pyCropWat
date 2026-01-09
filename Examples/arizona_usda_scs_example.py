@@ -409,7 +409,18 @@ def run_temporal_aggregation(dataset_name: str):
     Creates:
     - Annual totals
     - Monsoon season aggregations (July-September)
+    - Winter season aggregations (January-February)
     - Monthly climatology
+    
+    Parameters
+    ----------
+    dataset_name : str
+        Name of the dataset ('GridMET', 'PRISM', 'ERA5Land', or 'TerraClimate').
+        
+    Returns
+    -------
+    TemporalAggregator
+        The aggregator instance used for the dataset.
     """
     config = DATASETS[dataset_name]
     input_dir = Path(config['output_dir'])
@@ -497,6 +508,16 @@ def run_statistical_analysis(dataset_name: str):
     """
     Run statistical analysis for a dataset.
     
+    Parameters
+    ----------
+    dataset_name : str
+        Name of the dataset ('GridMET', 'PRISM', 'ERA5Land', or 'TerraClimate').
+        
+    Returns
+    -------
+    StatisticalAnalyzer
+        The analyzer instance used for the dataset.
+        
     Computes:
     - Anomalies for recent years
     - Long-term trends
@@ -574,7 +595,23 @@ def run_statistical_analysis(dataset_name: str):
 
 
 def create_zonal_summary_plot(zonal_df, dataset_name: str, output_dir: Path):
-    """Create summary plots for zonal statistics."""
+    """
+    Create summary plots for zonal statistics.
+    
+    Generates a figure with two panels:
+    - Time series of mean effective precipitation by zone
+    - Monthly climatology bar chart by zone
+    
+    Parameters
+    ----------
+    zonal_df : pandas.DataFrame
+        DataFrame containing zonal statistics with columns:
+        zone_id, year, month, mean, etc.
+    dataset_name : str
+        Name of the dataset for plot titles.
+    output_dir : Path
+        Directory to save the output plot.
+    """
     import matplotlib.pyplot as plt
     
     try:
@@ -647,9 +684,19 @@ def run_visualization(dataset_name: str):
     
     Creates:
     - Time series plots
-    - Monthly climatology bar charts
-    - Static raster maps
-    - Interactive maps
+    - Monthly climatology bar charts  
+    - Static raster maps for different seasons
+    - Interactive HTML maps
+    
+    Parameters
+    ----------
+    dataset_name : str
+        Name of the dataset ('GridMET', 'PRISM', 'ERA5Land', or 'TerraClimate').
+        
+    Returns
+    -------
+    Visualizer
+        The visualizer instance used for the dataset.
     """
     config = DATASETS[dataset_name]
     input_dir = Path(config['output_dir'])
@@ -744,6 +791,16 @@ def run_visualization(dataset_name: str):
 
 def plot_anomaly_maps(dataset_name: str):
     """
+    Create anomaly maps for recent years.
+    
+    Plots percent anomalies relative to climatology for years 2021-2023.
+    
+    Parameters
+    ----------
+    dataset_name : str
+        Name of the dataset ('GridMET', 'PRISM', 'ERA5Land', or 'TerraClimate').
+    """
+    """
     Create anomaly map visualizations for a dataset using Visualizer class.
     
     Plots percent anomalies for selected months using a diverging colormap.
@@ -787,6 +844,16 @@ def plot_anomaly_maps(dataset_name: str):
 
 
 def plot_climatology_maps(dataset_name: str):
+    """
+    Create monthly climatology maps.
+    
+    Plots long-term mean effective precipitation for each month.
+    
+    Parameters
+    ----------
+    dataset_name : str
+        Name of the dataset ('GridMET', 'PRISM', 'ERA5Land', or 'TerraClimate').
+    """
     """
     Create monthly climatology map visualizations for a dataset using Visualizer class.
     
@@ -836,6 +903,16 @@ def plot_climatology_maps(dataset_name: str):
 
 
 def plot_trend_maps(dataset_name: str):
+    """
+    Create trend maps showing Sen's slope and significance.
+    
+    Plots the Sen's slope (mm/year) and Mann-Kendall p-values.
+    
+    Parameters
+    ----------
+    dataset_name : str
+        Name of the dataset ('GridMET', 'PRISM', 'ERA5Land', or 'TerraClimate').
+    """
     """
     Create trend map visualizations for a dataset using Visualizer class.
     
@@ -991,6 +1068,9 @@ def compare_datasets():
 def compare_zonal_statistics():
     """
     Compare zonal statistics between GridMET and PRISM.
+    
+    Creates comparison plots showing time series and monthly climatology
+    for each Arizona zone (Central, Southern, Northern).
     """
     import matplotlib.pyplot as plt
     import pandas as pd
@@ -1109,6 +1189,15 @@ def compare_zonal_statistics():
 
 def compare_us_vs_global():
     """
+    Compare U.S. and Global datasets for Arizona.
+    
+    Creates comparison plots between U.S. datasets (GridMET, PRISM) and
+    global datasets (ERA5-Land, TerraClimate) including:
+    - Side-by-side spatial maps
+    - Scatter plot comparisons
+    - Time series comparisons
+    """
+    """
     Compare U.S.-specific datasets (GridMET, PRISM) with global datasets (ERA5-Land, TerraClimate).
     
     Creates:
@@ -1197,6 +1286,17 @@ def compare_us_vs_global():
 
 
 def create_multi_dataset_comparison(dataset_names: list):
+    """
+    Create comprehensive multi-dataset comparison.
+    
+    Generates a multi-panel figure comparing all available datasets
+    for a monsoon month (August), including spatial maps and statistics.
+    
+    Parameters
+    ----------
+    dataset_names : list of str
+        List of dataset names to compare.
+    """
     """
     Create summary comparison across all available datasets.
     """
@@ -1396,8 +1496,16 @@ def compare_methods_for_dataset(dataset_name: str, method_info: dict):
     """
     Compare effective precipitation methods for a specific dataset.
     
-    Creates a 2x3 plot showing the spatial distribution of Peff
-    calculated by each method.
+    Creates a 2x3 plot showing the spatial distribution of effective
+    precipitation calculated by each method for a sample monsoon month.
+    
+    Parameters
+    ----------
+    dataset_name : str
+        Name of the dataset to use as base precipitation.
+    method_info : dict
+        Dictionary with method names as keys and sub-dicts containing
+        'name' (display name) and 'color' for plotting.
     """
     import matplotlib.pyplot as plt
     import rioxarray
@@ -1500,6 +1608,18 @@ def compare_methods_for_dataset(dataset_name: str, method_info: dict):
 
 def plot_method_curves(method_info: dict):
     """
+    Plot theoretical effective precipitation curves for all methods.
+    
+    Creates a figure showing how each method transforms total precipitation
+    to effective precipitation across a range of 0-500 mm.
+    
+    Parameters
+    ----------
+    method_info : dict
+        Dictionary with method names as keys and sub-dicts containing
+        'name' (display name) and 'color' for plotting.
+    """
+    """
     Plot theoretical Peff curves for each method.
     
     Shows how each method transforms precipitation to effective precipitation,
@@ -1584,6 +1704,20 @@ def plot_method_curves(method_info: dict):
 
 
 def compare_methods_across_datasets(dataset_names: list, method_info: dict):
+    """
+    Compare effective precipitation methods across multiple datasets.
+    
+    Creates summary statistics and comparison plots showing how different
+    methods perform across U.S. and Global datasets.
+    
+    Parameters
+    ----------
+    dataset_names : list of str
+        List of dataset names to include in comparison.
+    method_info : dict
+        Dictionary with method names as keys and sub-dicts containing
+        'name' (display name) and 'color' for plotting.
+    """
     """
     Create summary comparison of methods across all datasets.
     
@@ -1767,7 +1901,17 @@ def compare_methods_across_datasets(dataset_names: list, method_info: dict):
 # =============================================================================
 
 def export_netcdf(dataset_name: str):
-    """Export dataset to NetCDF format."""
+    """
+    Export dataset to NetCDF format.
+    
+    Combines all monthly effective precipitation rasters into a single
+    NetCDF file with CF-compliant metadata.
+    
+    Parameters
+    ----------
+    dataset_name : str
+        Name of the dataset ('GridMET', 'PRISM', 'ERA5Land', or 'TerraClimate').
+    """
     config = DATASETS[dataset_name]
     input_dir = Path(config['output_dir'])
     output_file = ANALYSIS_DIR / f'{dataset_name}_usda_scs_peff_{START_YEAR}_{END_YEAR}.nc'
@@ -1884,7 +2028,9 @@ def run_analysis_only():
     """
     Run analysis workflow only (without GEE processing).
     
-    Use this if you already have processed effective precipitation data.
+    Use this if you already have processed effective precipitation data
+    from a previous run. Performs temporal aggregation, statistical
+    analysis, visualization, and dataset comparisons.
     """
     logger.info("Running analysis-only workflow...")
     

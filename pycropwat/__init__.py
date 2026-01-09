@@ -1,5 +1,70 @@
 """
-pyCropWat - A Python package for calculating CROPWAT effective precipitation from GEE climate data.
+pyCropWat - Calculate effective precipitation from Google Earth Engine climate data.
+
+pyCropWat is a Python package for calculating effective precipitation using
+various methods from climate data available on Google Earth Engine (GEE).
+It supports multiple precipitation datasets and effective precipitation
+calculation methods.
+
+Main Features
+-------------
+- Calculate effective precipitation from GEE climate datasets
+- Support for multiple methods (CROPWAT, FAO/AGLW, USDA-SCS, etc.)
+- Temporal aggregation (seasonal, annual, growing season)
+- Statistical analysis (trends, anomalies, climatology)
+- Publication-quality visualization
+- Export to NetCDF and Cloud-Optimized GeoTIFF formats
+
+Quick Start
+-----------
+>>> from pycropwat import EffectivePrecipitation
+>>> 
+>>> # Calculate effective precipitation using ERA5-Land data
+>>> ep = EffectivePrecipitation(
+...     asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
+...     precip_band='total_precipitation_sum',
+...     geometry_path='study_area.geojson',
+...     start_year=2015,
+...     end_year=2020,
+...     precip_scale_factor=1000,  # Convert m to mm
+...     method='cropwat'
+... )
+>>> results = ep.process(output_dir='./output', n_workers=4)
+
+Supported Precipitation Datasets
+--------------------------------
+- ERA5-Land (global, ~11km): ``'ECMWF/ERA5_LAND/MONTHLY_AGGR'``
+- TerraClimate (global, ~4km): ``'IDAHO_EPSCOR/TERRACLIMATE'``
+- GridMET (CONUS, ~4km): ``'IDAHO_EPSCOR/GRIDMET'``
+- PRISM (CONUS, ~4km): ``'OREGONSTATE/PRISM/AN81m'``
+- CHIRPS (50°S-50°N, ~5km): ``'UCSB-CHG/CHIRPS/DAILY'``
+- GPM IMERG (global, ~11km): ``'NASA/GPM_L3/IMERG_MONTHLY_V06'``
+
+Effective Precipitation Methods
+-------------------------------
+- ``'cropwat'`` - USDA SCS/CROPWAT method (FAO standard, default)
+- ``'fao_aglw'`` - FAO Land and Water Division formula
+- ``'fixed_percentage'`` - Simple fixed percentage method
+- ``'dependable_rainfall'`` - FAO Dependable Rainfall method
+- ``'farmwest'`` - Washington State University FarmWest method
+- ``'usda_scs'`` - USDA-SCS soil moisture depletion method
+
+Modules
+-------
+core
+    Main :class:`EffectivePrecipitation` class for calculations.
+methods
+    Individual effective precipitation calculation functions.
+analysis
+    :class:`TemporalAggregator`, :class:`StatisticalAnalyzer`, 
+    :class:`Visualizer`, and export functions.
+utils
+    Utility functions for GEE and file operations.
+
+See Also
+--------
+Documentation: https://pycropwat.readthedocs.io/
+GitHub: https://github.com/username/pycropwat
 """
 
 from .core import EffectivePrecipitation
@@ -9,6 +74,8 @@ from .methods import (
     fao_aglw_effective_precip,
     fixed_percentage_effective_precip,
     dependable_rainfall_effective_precip,
+    farmwest_effective_precip,
+    usda_scs_effective_precip,
     get_method_function,
     list_available_methods,
 )
@@ -34,6 +101,8 @@ __all__ = [
     "fao_aglw_effective_precip",
     "fixed_percentage_effective_precip",
     "dependable_rainfall_effective_precip",
+    "farmwest_effective_precip",
+    "usda_scs_effective_precip",
     "get_method_function",
     "list_available_methods",
     # Analysis

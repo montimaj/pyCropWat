@@ -2,7 +2,64 @@
 Effective precipitation calculation methods.
 
 This module provides various methods for calculating effective precipitation
-from total precipitation data.
+from total precipitation data. Effective precipitation represents the portion
+of total rainfall that is available for crop use after accounting for losses
+due to surface runoff, deep percolation, and evaporation.
+
+Available Methods
+-----------------
+cropwat
+    USDA SCS/CROPWAT method - The default method used in FAO CROPWAT software.
+    Based on the USDA Soil Conservation Service formula.
+    
+fao_aglw
+    FAO Land and Water Division formula from FAO Irrigation Paper No. 33.
+    A two-part linear approximation.
+    
+fixed_percentage
+    Simple fixed percentage method. Assumes a constant fraction (default 70%)
+    of precipitation is effective.
+    
+dependable_rainfall
+    FAO Dependable Rainfall method. Estimates rainfall that can be depended
+    upon at a given probability level (default 75%).
+    
+farmwest
+    Washington State University FarmWest method. Simple empirical formula
+    assuming 5mm interception loss and 75% effectiveness.
+    
+usda_scs
+    USDA-SCS soil moisture depletion method. Accounts for soil water holding
+    capacity (AWC) and evaporative demand (ETo). Requires additional GEE
+    assets for AWC and ETo data.
+
+Example
+-------
+>>> from pycropwat.methods import (
+...     cropwat_effective_precip,
+...     list_available_methods
+... )
+>>> import numpy as np
+>>> 
+>>> # Calculate effective precipitation
+>>> precip = np.array([50, 100, 200, 300])
+>>> eff_precip = cropwat_effective_precip(precip)
+>>> 
+>>> # List all available methods
+>>> methods = list_available_methods()
+>>> for name, description in methods.items():
+...     print(f"{name}: {description}")
+
+References
+----------
+Smith, M. (1992). CROPWAT: A computer program for irrigation planning
+    and management. FAO Irrigation and Drainage Paper No. 46.
+    
+FAO. (1986). Yield response to water. FAO Irrigation and Drainage
+    Paper No. 33.
+    
+USDA SCS. (1993). Chapter 2 Irrigation Water Requirements. In Part 623
+    National Engineering Handbook.
 """
 
 import numpy as np
