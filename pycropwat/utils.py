@@ -29,16 +29,18 @@ get_monthly_dates
 
 Example
 -------
->>> from pycropwat.utils import initialize_gee, load_geometry
->>> 
->>> # Initialize GEE with project
->>> initialize_gee(project='my-gee-project')
->>> 
->>> # Load geometry from local file
->>> geom = load_geometry('study_area.geojson')
->>> 
->>> # Load geometry from GEE asset
->>> geom = load_geometry(gee_asset='projects/my-project/assets/boundary')
+```python
+from pycropwat.utils import initialize_gee, load_geometry
+
+# Initialize GEE with project
+initialize_gee(project='my-gee-project')
+
+# Load geometry from local file
+geom = load_geometry('study_area.geojson')
+
+# Load geometry from GEE asset
+geom = load_geometry(gee_asset='projects/my-project/assets/boundary')
+```
 """
 
 from pathlib import Path
@@ -54,6 +56,7 @@ def is_gee_asset(path: str) -> bool:
     
     Parameters
     ----------
+    
     path : str
         Path to check.
         
@@ -79,6 +82,7 @@ def load_geometry_from_gee_asset(asset_id: str) -> ee.Geometry:
     
     Parameters
     ----------
+    
     asset_id : str
         GEE FeatureCollection asset ID (e.g., 'projects/my-project/assets/my_boundary').
         
@@ -99,6 +103,7 @@ def load_geometry_from_file(geometry_path: Union[str, Path]) -> ee.Geometry:
     
     Parameters
     ----------
+    
     geometry_path : str or Path
         Path to the shapefile (.shp) or GeoJSON (.geojson, .json) file.
         
@@ -143,9 +148,11 @@ def load_geometry(
     
     Parameters
     ----------
+    
     geometry_source : str or Path
         Path to a local shapefile (.shp) or GeoJSON (.geojson, .json) file,
         OR a GEE FeatureCollection asset ID.
+    
     gee_asset : str, optional
         Explicit GEE FeatureCollection asset ID. If provided, this takes
         precedence over geometry_source.
@@ -157,14 +164,23 @@ def load_geometry(
         
     Examples
     --------
-    >>> # Load from local file
-    >>> geom = load_geometry('boundary.geojson')
+    Load from local file:
     
-    >>> # Load from GEE asset
-    >>> geom = load_geometry(gee_asset='projects/my-project/assets/boundary')
+    ```python
+    geom = load_geometry('boundary.geojson')
+    ```
     
-    >>> # Auto-detect GEE asset from path
-    >>> geom = load_geometry('users/username/my_boundary')
+    Load from GEE asset:
+    
+    ```python
+    geom = load_geometry(gee_asset='projects/my-project/assets/boundary')
+    ```
+    
+    Auto-detect GEE asset from path:
+    
+    ```python
+    geom = load_geometry('users/username/my_boundary')
+    ```
     """
     # If explicit GEE asset provided, use it
     if gee_asset is not None:
@@ -184,8 +200,10 @@ def get_date_range(start_year: int, end_year: int) -> Tuple[str, str]:
     
     Parameters
     ----------
+    
     start_year : int
         Start year (inclusive).
+    
     end_year : int
         End year (inclusive).
         
@@ -205,8 +223,10 @@ def get_monthly_dates(start_year: int, end_year: int) -> List[Tuple[int, int]]:
     
     Parameters
     ----------
+    
     start_year : int
         Start year (inclusive).
+    
     end_year : int
         End year (inclusive).
         
@@ -228,6 +248,7 @@ def initialize_gee(project: str = None) -> None:
     
     Parameters
     ----------
+    
     project : str, optional
         GEE project ID. If None, uses default authentication.
     """

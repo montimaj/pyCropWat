@@ -40,6 +40,9 @@ plugins:
             show_root_heading: true
             show_root_full_path: false
             docstring_style: numpy
+            show_signature_annotations: true
+            separate_signature: true
+            merge_init_into_class: true
 
 markdown_extensions:
   - pymdownx.highlight:

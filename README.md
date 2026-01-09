@@ -30,8 +30,10 @@ pyCropWat/
 │   ├── assets/              # Documentation assets
 │   │   └── examples/        # Example output images for docs
 │   ├── api/                 # API reference
+│   │   ├── analysis.md
 │   │   ├── cli.md
 │   │   ├── core.md
+│   │   ├── methods.md
 │   │   └── utils.md
 │   └── user-guide/          # User guide
 │       ├── api.md

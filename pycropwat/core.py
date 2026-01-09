@@ -15,17 +15,19 @@ The module supports multiple effective precipitation methods:
 
 Example
 -------
->>> from pycropwat import EffectivePrecipitation
->>> ep = EffectivePrecipitation(
-...     asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
-...     precip_band='total_precipitation_sum',
-...     geometry_path='study_area.geojson',
-...     start_year=2015,
-...     end_year=2020,
-...     precip_scale_factor=1000,
-...     method='cropwat'
-... )
->>> results = ep.process(output_dir='./output', n_workers=4)
+```python
+from pycropwat import EffectivePrecipitation
+ep = EffectivePrecipitation(
+    asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
+    precip_band='total_precipitation_sum',
+    geometry_path='study_area.geojson',
+    start_year=2015,
+    end_year=2020,
+    precip_scale_factor=1000,
+    method='cropwat'
+)
+results = ep.process(output_dir='./output', n_workers=4)
+```
 
 See Also
 --------
@@ -69,51 +71,54 @@ class EffectivePrecipitation:
     
     Parameters
     ----------
+    
     asset_id : str
         GEE ImageCollection asset ID for precipitation data.
-        Common options include:
+        Common options: 
         
-        - ``'ECMWF/ERA5_LAND/MONTHLY_AGGR'`` - ERA5-Land (global, ~11km)
-        - ``'IDAHO_EPSCOR/TERRACLIMATE'`` - TerraClimate (global, ~4km)
-        - ``'IDAHO_EPSCOR/GRIDMET'`` - GridMET (CONUS, ~4km)
-        - ``'OREGONSTATE/PRISM/AN81m'`` - PRISM (CONUS, ~4km)
-        - ``'UCSB-CHG/CHIRPS/DAILY'`` - CHIRPS (50°S-50°N, ~5km)
-        - ``'NASA/GPM_L3/IMERG_MONTHLY_V06'`` - GPM IMERG (global, ~11km)
-        
+        * ``ECMWF/ERA5_LAND/MONTHLY_AGGR`` (ERA5-Land, global, ~11km),
+        * ``IDAHO_EPSCOR/TERRACLIMATE`` (TerraClimate, global, ~4km),
+        * ``IDAHO_EPSCOR/GRIDMET`` (GridMET, CONUS, ~4km),
+        * ``OREGONSTATE/PRISM/AN81m`` (PRISM, CONUS, ~4km),
+        * ``UCSB-CHG/CHIRPS/DAILY`` (CHIRPS, 50°S-50°N, ~5km),
+        * ``NASA/GPM_L3/IMERG_MONTHLY_V06`` (GPM IMERG, global, ~11km).
+    
     precip_band : str
         Name of the precipitation band in the asset. Examples:
         
-        - ERA5-Land: ``'total_precipitation_sum'``
-        - TerraClimate: ``'pr'``
-        - GridMET: ``'pr'``
-        - PRISM: ``'ppt'``
-        - CHIRPS: ``'precipitation'``
-        - GPM IMERG: ``'precipitation'``
+        * ERA5-Land: ``total_precipitation_sum``
+        * TerraClimate: ``pr``
+        * GridMET: ``pr``
+        * PRISM: ``ppt``
+        * CHIRPS: ``precipitation``
+        * GPM IMERG: ``precipitation``
         
     geometry_path : str, Path, or None
         Path to shapefile or GeoJSON file defining the region of interest.
         Can also be a GEE FeatureCollection asset ID. Set to None if using
         gee_geometry_asset instead.
+
     start_year : int
         Start year for processing (inclusive).
+    
     end_year : int
         End year for processing (inclusive).
+    
     scale : float, optional
         Output resolution in meters. If None (default), uses native resolution
         of the dataset.
+    
     precip_scale_factor : float, optional
         Factor to convert precipitation to mm. Default is 1.0.
-        Common values:
-        
-        - ERA5-Land (m to mm): 1000
-        - TerraClimate (already mm): 1.0
-        - GridMET (already mm): 1.0
-        
+        Common values: ERA5-Land (m to mm) = 1000, TerraClimate = 1.0, GridMET = 1.0.
+    
     gee_project : str, optional
         GEE project ID for authentication. Required for cloud-based GEE access.
+    
     gee_geometry_asset : str, optional
         GEE FeatureCollection asset ID for the region of interest.
         Takes precedence over geometry_path if both are provided.
+
     method : str, optional
         Effective precipitation calculation method. Default is 'cropwat'.
         Options:
@@ -154,8 +159,10 @@ class EffectivePrecipitation:
     ----------
     geometry : ee.Geometry
         The loaded geometry for the region of interest.
+    
     collection : ee.ImageCollection
         The filtered and scaled precipitation image collection.
+    
     bounds : list
         Bounding box coordinates of the geometry.
         
@@ -163,72 +170,82 @@ class EffectivePrecipitation:
     --------
     Basic usage with CROPWAT method (default):
     
-    >>> from pycropwat import EffectivePrecipitation
-    >>> ep = EffectivePrecipitation(
-    ...     asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
-    ...     precip_band='total_precipitation_sum',
-    ...     geometry_path='roi.geojson',
-    ...     start_year=2015,
-    ...     end_year=2020,
-    ...     precip_scale_factor=1000
-    ... )
-    >>> ep.process(output_dir='./output', n_workers=4)
+    ```python
+    from pycropwat import EffectivePrecipitation
+    ep = EffectivePrecipitation(
+        asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
+        precip_band='total_precipitation_sum',
+        geometry_path='roi.geojson',
+        start_year=2015,
+        end_year=2020,
+        precip_scale_factor=1000
+    )
+    ep.process(output_dir='./output', n_workers=4)
+    ```
     
     Using GEE FeatureCollection asset:
     
-    >>> ep = EffectivePrecipitation(
-    ...     asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
-    ...     precip_band='total_precipitation_sum',
-    ...     gee_geometry_asset='projects/my-project/assets/study_area',
-    ...     start_year=2015,
-    ...     end_year=2020,
-    ...     precip_scale_factor=1000,
-    ...     gee_project='my-gee-project'
-    ... )
+    ```python
+    ep = EffectivePrecipitation(
+        asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
+        precip_band='total_precipitation_sum',
+        gee_geometry_asset='projects/my-project/assets/study_area',
+        start_year=2015,
+        end_year=2020,
+        precip_scale_factor=1000,
+        gee_project='my-gee-project'
+    )
+    ```
     
     Using FAO/AGLW method:
     
-    >>> ep = EffectivePrecipitation(
-    ...     asset_id='IDAHO_EPSCOR/TERRACLIMATE',
-    ...     precip_band='pr',
-    ...     geometry_path='study_area.geojson',
-    ...     start_year=2000,
-    ...     end_year=2020,
-    ...     method='fao_aglw'
-    ... )
+    ```python
+    ep = EffectivePrecipitation(
+        asset_id='IDAHO_EPSCOR/TERRACLIMATE',
+        precip_band='pr',
+        geometry_path='study_area.geojson',
+        start_year=2000,
+        end_year=2020,
+        method='fao_aglw'
+    )
+    ```
     
     Using fixed percentage method (80%):
     
-    >>> ep = EffectivePrecipitation(
-    ...     asset_id='IDAHO_EPSCOR/GRIDMET',
-    ...     precip_band='pr',
-    ...     geometry_path='farm.geojson',
-    ...     start_year=2010,
-    ...     end_year=2020,
-    ...     method='fixed_percentage',
-    ...     method_params={'percentage': 0.8}
-    ... )
+    ```python
+    ep = EffectivePrecipitation(
+        asset_id='IDAHO_EPSCOR/GRIDMET',
+        precip_band='pr',
+        geometry_path='farm.geojson',
+        start_year=2010,
+        end_year=2020,
+        method='fixed_percentage',
+        method_params={'percentage': 0.8}
+    )
+    ```
     
     Using USDA-SCS method with AWC and ETo data:
     
-    >>> ep = EffectivePrecipitation(
-    ...     asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
-    ...     precip_band='total_precipitation_sum',
-    ...     geometry_path='arizona.geojson',
-    ...     start_year=2015,
-    ...     end_year=2020,
-    ...     precip_scale_factor=1000,
-    ...     method='usda_scs',
-    ...     method_params={
-    ...         'awc_asset': 'projects/my-project/assets/soil_awc',
-    ...         'awc_band': 'AWC',
-    ...         'eto_asset': 'IDAHO_EPSCOR/GRIDMET',
-    ...         'eto_band': 'eto',
-    ...         'eto_is_daily': True,
-    ...         'rooting_depth': 1.0
-    ...     }
-    ... )
-    
+    ```python
+    ep = EffectivePrecipitation(
+        asset_id='ECMWF/ERA5_LAND/MONTHLY_AGGR',
+        precip_band='total_precipitation_sum',
+        geometry_path='arizona.geojson',
+        start_year=2015,
+        end_year=2020,
+        precip_scale_factor=1000,
+        method='usda_scs',
+        method_params={
+            'awc_asset': 'projects/my-project/assets/soil_awc',
+            'awc_band': 'AWC',
+            'eto_asset': 'IDAHO_EPSCOR/GRIDMET',
+            'eto_band': 'eto',
+            'eto_is_daily': True,
+            'rooting_depth': 1.0
+        }
+    )
+    ```
+
     See Also
     --------
     pycropwat.methods : Individual effective precipitation calculation functions.
@@ -313,6 +330,7 @@ class EffectivePrecipitation:
         
         Parameters
         ----------
+        
         pr : np.ndarray
             Precipitation in mm.
             
@@ -354,8 +372,10 @@ class EffectivePrecipitation:
         
         Parameters
         ----------
+        
         bounds_coords : list
             Bounding box coordinates [[min_lon, min_lat], [max_lon, min_lat], ...]
+        
         scale_meters : float
             Resolution in meters.
             
@@ -388,8 +408,10 @@ class EffectivePrecipitation:
         
         Parameters
         ----------
+        
         bounds_coords : list
             Bounding box coordinates.
+        
         scale_meters : float
             Resolution in meters.
             
@@ -442,10 +464,13 @@ class EffectivePrecipitation:
         
         Parameters
         ----------
+        
         img : ee.Image
             Image to download.
+        
         tile : ee.Geometry
             Tile geometry.
+        
         default_value : float
             Default value for missing data.
             
@@ -483,10 +508,13 @@ class EffectivePrecipitation:
         
         Parameters
         ----------
+        
         tile_files : list
             List of tile file paths.
+        
         output_path : Path
             Output mosaic file path.
+        
         cleanup : bool
             Whether to delete tile files after mosaicking.
             
@@ -539,8 +567,10 @@ class EffectivePrecipitation:
         
         Parameters
         ----------
+        
         year : int
             Year.
+        
         month : int
             Month (1-12).
             
@@ -563,10 +593,13 @@ class EffectivePrecipitation:
         
         Parameters
         ----------
+        
         year : int
             Year.
+        
         month : int
             Month (1-12).
+        
         temp_dir : Path, optional
             Temporary directory for tile files. If None, uses system temp.
             
@@ -678,6 +711,7 @@ class EffectivePrecipitation:
         
         Parameters
         ----------
+        
         template_da : xr.DataArray
             Template DataArray to match spatial extent and resolution.
             Typically a precipitation DataArray from the same month.
@@ -798,10 +832,13 @@ class EffectivePrecipitation:
         
         Parameters
         ----------
+        
         year : int
             Year to load.
+        
         month : int
             Month to load (1-12).
+        
         template_da : xr.DataArray
             Template DataArray to match spatial extent and resolution.
             Typically a precipitation DataArray from the same month.
@@ -946,16 +983,22 @@ class EffectivePrecipitation:
         
         Parameters
         ----------
+        
         img : ee.Image
             Image to download.
+        
         bounds_coords : list
             Bounding box coordinates.
+        
         scale_meters : float
             Resolution in meters.
+        
         year : int
             Year.
+        
         month : int
             Month.
+        
         temp_dir : Path, optional
             Temporary directory for tiles.
             
@@ -1063,10 +1106,13 @@ class EffectivePrecipitation:
         
         Parameters
         ----------
+        
         year : int
             Year.
+        
         month : int
             Month (1-12).
+        
         output_dir : Path
             Output directory.
             
@@ -1171,18 +1217,23 @@ class EffectivePrecipitation:
         
         Parameters
         ----------
+        
         output_dir : str or Path
             Directory to save output rasters. Will be created if it
             doesn't exist.
+        
         n_workers : int, optional
             Number of parallel workers for Dask. Default is 4.
             Set to 1 for sequential processing.
+        
         months : list of int, optional
             List of months to process (1-12). If None, processes all months
             in the date range. Useful for seasonal analyses.
+        
         input_dir : str or Path, optional
             Directory to save downloaded input data (precipitation, AWC, ETo).
             If None and save_inputs is True, uses ``output_dir/../analysis_inputs``.
+        
         save_inputs : bool, optional
             Whether to save downloaded input data as GeoTIFF files.
             Default is False. Useful for debugging or further analysis.
@@ -1208,27 +1259,33 @@ class EffectivePrecipitation:
         --------
         Process all months in parallel:
         
-        >>> ep = EffectivePrecipitation(...)
-        >>> results = ep.process(output_dir='./output', n_workers=8)
+        ```python
+        ep = EffectivePrecipitation(...)
+        results = ep.process(output_dir='./output', n_workers=8)
+        ```
         
         Process only summer months:
         
-        >>> results = ep.process(
-        ...     output_dir='./output',
-        ...     months=[6, 7, 8]  # June, July, August
-        ... )
+        ```python
+        results = ep.process(
+            output_dir='./output',
+            months=[6, 7, 8]  # June, July, August
+        )
+        ```
         
         Save input data for debugging:
         
-        >>> results = ep.process(
-        ...     output_dir='./output',
-        ...     save_inputs=True,
-        ...     input_dir='./inputs'
-        ... )
-        
+        ```python
+        results = ep.process(
+            output_dir='./output',
+            save_inputs=True,
+            input_dir='./inputs'
+        )
+        ```
+
         See Also
         --------
-        process_sequential : Sequential processing for debugging.
+            process_sequential: Sequential processing for debugging.
         """
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -1281,15 +1338,19 @@ class EffectivePrecipitation:
         
         Parameters
         ----------
+        
         output_dir : str or Path
             Directory to save output rasters. Will be created if it
             doesn't exist.
+        
         months : list of int, optional
             List of months to process (1-12). If None, processes all months
             in the date range.
+        
         input_dir : str or Path, optional
             Directory to save downloaded input data (precipitation, AWC, ETo).
             If None and save_inputs is True, uses ``output_dir/../analysis_inputs``.
+        
         save_inputs : bool, optional
             Whether to save downloaded input data. Default is False.
             
@@ -1302,16 +1363,19 @@ class EffectivePrecipitation:
             
         Examples
         --------
-        >>> ep = EffectivePrecipitation(...)
-        >>> # Debug a single month
-        >>> results = ep.process_sequential(
-        ...     output_dir='./output',
-        ...     months=[1]  # Process only January
-        ... )
+        Debug a single month:
         
+        ```python
+        ep = EffectivePrecipitation(...)
+        results = ep.process_sequential(
+            output_dir='./output',
+            months=[1]  # Process only January
+        )
+        ```
+
         See Also
         --------
-        process : Parallel processing method (recommended for production).
+            process: Parallel processing method (recommended for production).
         """
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)

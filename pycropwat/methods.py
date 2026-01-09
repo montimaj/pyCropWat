@@ -8,47 +8,41 @@ due to surface runoff, deep percolation, and evaporation.
 
 Available Methods
 -----------------
-cropwat
-    USDA SCS/CROPWAT method - The default method used in FAO CROPWAT software.
-    Based on the USDA Soil Conservation Service formula.
+* cropwat: USDA SCS/CROPWAT method - The default method used in FAO CROPWAT software. 
+Based on the USDA Soil Conservation Service formula.
     
-fao_aglw
-    FAO Land and Water Division formula from FAO Irrigation Paper No. 33.
-    A two-part linear approximation.
+* fao_aglw: FAO Land and Water Division formula from FAO Irrigation Paper No. 33. A two-part linear approximation.
     
-fixed_percentage
-    Simple fixed percentage method. Assumes a constant fraction (default 70%)
-    of precipitation is effective.
+* fixed_percentage: Simple fixed percentage method. Assumes a constant fraction (default 70%) of precipitation is 
+effective.
     
-dependable_rainfall
-    FAO Dependable Rainfall method. Estimates rainfall that can be depended
+* dependable_rainfall: FAO Dependable Rainfall method. Estimates rainfall that can be depended
     upon at a given probability level (default 75%).
     
-farmwest
-    Washington State University FarmWest method. Simple empirical formula
-    assuming 5mm interception loss and 75% effectiveness.
+* farmwest: FarmWest method (https://statics.teams.cdn.office.net/evergreen-assets/safelinks/2/atp-safelinks.html). 
+Simple empirical formula assuming 5mm interception loss and 75% effectiveness.
     
-usda_scs
-    USDA-SCS soil moisture depletion method. Accounts for soil water holding
-    capacity (AWC) and evaporative demand (ETo). Requires additional GEE
-    assets for AWC and ETo data.
+* usda_scs: USDA-SCS soil moisture depletion method. Accounts for soil water holding capacity (AWC) and 
+evaporative demand (ETo). Requires additional GEE assets for AWC and ETo data.
 
-Example
--------
->>> from pycropwat.methods import (
-...     cropwat_effective_precip,
-...     list_available_methods
-... )
->>> import numpy as np
->>> 
->>> # Calculate effective precipitation
->>> precip = np.array([50, 100, 200, 300])
->>> eff_precip = cropwat_effective_precip(precip)
->>> 
->>> # List all available methods
->>> methods = list_available_methods()
->>> for name, description in methods.items():
-...     print(f"{name}: {description}")
+Examples
+--------
+```python
+from pycropwat.methods import (
+    cropwat_effective_precip,
+    list_available_methods
+)
+import numpy as np
+
+# Calculate effective precipitation
+precip = np.array([50, 100, 200, 300])
+eff_precip = cropwat_effective_precip(precip)
+
+# List all available methods
+methods = list_available_methods()
+for name, description in methods.items():
+    print(f"{name}: {description}")
+```
 
 References
 ----------
@@ -88,6 +82,7 @@ def cropwat_effective_precip(pr: np.ndarray) -> np.ndarray:
     
     Parameters
     ----------
+    
     pr : np.ndarray
         Precipitation in mm.
         
@@ -124,6 +119,7 @@ def fao_aglw_effective_precip(pr: np.ndarray) -> np.ndarray:
     
     Parameters
     ----------
+    
     pr : np.ndarray
         Precipitation in mm.
         
@@ -160,8 +156,10 @@ def fixed_percentage_effective_precip(
     
     Parameters
     ----------
+    
     pr : np.ndarray
         Precipitation in mm.
+    
     percentage : float, optional
         Fraction of precipitation that is effective (0-1).
         Default is 0.7 (70%).
@@ -197,8 +195,10 @@ def dependable_rainfall_effective_precip(
     
     Parameters
     ----------
+    
     pr : np.ndarray
         Monthly precipitation in mm.
+    
     probability : float, optional
         Probability level (0.5-0.9). Default is 0.75 (75%).
         Higher probability = more conservative estimate.
@@ -254,6 +254,7 @@ def farmwest_effective_precip(pr: np.ndarray) -> np.ndarray:
     
     Parameters
     ----------
+    
     pr : np.ndarray
         Precipitation in mm.
         
@@ -295,13 +296,17 @@ def usda_scs_effective_precip(
     
     Parameters
     ----------
+    
     pr : np.ndarray
         Total precipitation in mm.
+    
     eto : np.ndarray
         Reference evapotranspiration in mm.
+    
     awc : np.ndarray
         Available Water Capacity in inches/inch (volumetric fraction).
         For SSURGO data, this is typically in units of cm/cm.
+    
     rooting_depth : float, optional
         Crop rooting depth in meters. Default is 1.0 m.
         
@@ -365,6 +370,7 @@ def get_method_function(method: PeffMethod):
     
     Parameters
     ----------
+    
     method : str
         Method name: 'cropwat', 'fao_aglw', 'fixed_percentage', 
         'dependable_rainfall', 'farmwest', or 'usda_scs'.

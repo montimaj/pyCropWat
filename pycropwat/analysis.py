@@ -28,26 +28,28 @@ export_to_cog
 
 Example
 -------
->>> from pycropwat.analysis import (
-...     TemporalAggregator,
-...     StatisticalAnalyzer,
-...     Visualizer
-... )
->>> 
->>> # Temporal aggregation
->>> agg = TemporalAggregator('./output')
->>> annual = agg.annual_aggregate(2020, method='sum')
->>> seasonal = agg.seasonal_aggregate(2020, 'JJA')
->>> 
->>> # Statistical analysis
->>> stats = StatisticalAnalyzer('./output')
->>> trend = stats.calculate_trend(2010, 2020)
->>> anomaly = stats.calculate_anomaly(2020)
->>> 
->>> # Visualization
->>> viz = Visualizer()
->>> viz.plot_map(annual, title='Annual Effective Precipitation 2020')
->>> viz.plot_time_series(stats.get_time_series(2010, 2020))
+```python
+from pycropwat.analysis import (
+    TemporalAggregator,
+    StatisticalAnalyzer,
+    Visualizer
+)
+
+# Temporal aggregation
+agg = TemporalAggregator('./output')
+annual = agg.annual_aggregate(2020, method='sum')
+seasonal = agg.seasonal_aggregate(2020, 'JJA')
+
+# Statistical analysis
+stats = StatisticalAnalyzer('./output')
+trend = stats.calculate_trend(2010, 2020)
+anomaly = stats.calculate_anomaly(2020)
+
+# Visualization
+viz = Visualizer()
+viz.plot_map(annual, title='Annual Effective Precipitation 2020')
+viz.plot_time_series(stats.get_time_series(2010, 2020))
+```
 
 Notes
 -----
@@ -95,8 +97,10 @@ class TemporalAggregator:
     
     Parameters
     ----------
+    
     input_dir : str or Path
         Directory containing monthly effective precipitation rasters.
+    
     pattern : str, optional
         Glob pattern for finding input files. Default is 'effective_precip_[0-9]*.tif'
         which excludes fraction files. Use 'effective_precip_fraction_*.tif' to work
@@ -104,17 +108,18 @@ class TemporalAggregator:
         
     Examples
     --------
-    >>> from pycropwat.analysis import TemporalAggregator
-    >>> agg = TemporalAggregator('./output')
-    >>> 
-    >>> # Annual totals
-    >>> annual = agg.annual_aggregate(2020, 'sum')
-    >>> 
-    >>> # Seasonal aggregation
-    >>> seasonal = agg.seasonal_aggregate(2020, 'JJA', 'sum')
-    >>> 
-    >>> # Growing season (April-October)
-    >>> growing = agg.custom_aggregate(2020, months=[4, 5, 6, 7, 8, 9, 10])
+    Basic usage:
+    
+    ```python
+    from pycropwat.analysis import TemporalAggregator
+    agg = TemporalAggregator('./output')
+    # Annual totals
+    annual = agg.annual_aggregate(2020, 'sum')
+    # Seasonal aggregation
+    seasonal = agg.seasonal_aggregate(2020, 'JJA', 'sum')
+    # Growing season (April-October)
+    growing = agg.custom_aggregate(2020, months=[4, 5, 6, 7, 8, 9, 10])
+    ```
     """
     
     def __init__(
@@ -162,8 +167,10 @@ class TemporalAggregator:
         
         Parameters
         ----------
+        
         year : int
             Year to load.
+        
         months : list of int
             Months to load (1-12).
             
@@ -209,11 +216,14 @@ class TemporalAggregator:
         
         Parameters
         ----------
+        
         year : int
             Year to aggregate.
+        
         method : str, optional
             Aggregation method: 'sum', 'mean', 'min', 'max', 'std'.
             Default is 'sum'.
+        
         output_path : str or Path, optional
             Path to save output raster. If None, returns DataArray only.
             
@@ -242,13 +252,17 @@ class TemporalAggregator:
         
         Parameters
         ----------
+        
         year : int
             Year to aggregate. For DJF, December is from the previous year.
+        
         season : str
             Season code: 'DJF', 'MAM', 'JJA', or 'SON'.
+        
         method : str, optional
             Aggregation method: 'sum', 'mean', 'min', 'max', 'std'.
             Default is 'sum'.
+        
         output_path : str or Path, optional
             Path to save output raster.
             
@@ -309,15 +323,20 @@ class TemporalAggregator:
         
         Parameters
         ----------
+        
         year : int
             Year to aggregate.
+        
         months : list of int
             List of months to include (1-12).
+        
         method : str, optional
             Aggregation method: 'sum', 'mean', 'min', 'max', 'std'.
             Default is 'sum'.
+        
         output_path : str or Path, optional
             Path to save output raster.
+        
         output_name : str, optional
             Name for output attributes.
             
@@ -356,14 +375,19 @@ class TemporalAggregator:
         
         Parameters
         ----------
+        
         year : int
             Year to aggregate.
+        
         start_month : int, optional
             Growing season start month (1-12). Default is 4 (April).
+        
         end_month : int, optional
             Growing season end month (1-12). Default is 10 (October).
+        
         method : str, optional
             Aggregation method. Default is 'sum'.
+        
         output_path : str or Path, optional
             Path to save output raster.
             
@@ -412,12 +436,16 @@ class TemporalAggregator:
         
         Parameters
         ----------
+        
         start_year : int
             Start year (inclusive).
+        
         end_year : int
             End year (inclusive).
+        
         months : list of int, optional
             Months to include. If None, calculates for each month.
+        
         output_dir : str or Path, optional
             Directory to save output rasters.
             
@@ -469,21 +497,25 @@ class StatisticalAnalyzer:
     
     Parameters
     ----------
+    
     input_dir : str or Path
         Directory containing monthly effective precipitation rasters.
+    
     pattern : str, optional
         Glob pattern for finding input files.
         
     Examples
     --------
-    >>> from pycropwat.analysis import StatisticalAnalyzer
-    >>> stats = StatisticalAnalyzer('./output')
-    >>> 
-    >>> # Calculate anomaly
-    >>> anomaly = stats.calculate_anomaly(2020, 6, clim_start=1990, clim_end=2020)
-    >>> 
-    >>> # Calculate trend
-    >>> trend, pvalue = stats.calculate_trend(start_year=2000, end_year=2020, month=6)
+    Basic usage:
+    
+    ```python
+    from pycropwat.analysis import StatisticalAnalyzer
+    stats = StatisticalAnalyzer('./output')
+    # Calculate anomaly
+    anomaly = stats.calculate_anomaly(2020, 6, clim_start=1990, clim_end=2020)
+    # Calculate trend
+    trend, pvalue = stats.calculate_trend(start_year=2000, end_year=2020, month=6)
+    ```
     """
     
     def __init__(
@@ -509,17 +541,23 @@ class StatisticalAnalyzer:
         
         Parameters
         ----------
+        
         year : int
             Year of interest.
+        
         month : int
             Month of interest (1-12).
+        
         clim_start : int
             Climatology start year.
+        
         clim_end : int
             Climatology end year.
+        
         anomaly_type : str, optional
             Type of anomaly: 'absolute', 'percent', or 'standardized'.
             Default is 'absolute'.
+        
         output_path : str or Path, optional
             Path to save output raster.
             
@@ -591,15 +629,20 @@ class StatisticalAnalyzer:
         
         Parameters
         ----------
+        
         start_year : int
             Start year for trend analysis.
+        
         end_year : int
             End year for trend analysis.
+        
         month : int, optional
             Specific month to analyze. If None, uses annual totals.
+        
         method : str, optional
             Trend method: 'linear' (OLS) or 'sen' (Theil-Sen).
             Default is 'linear'.
+        
         output_dir : str or Path, optional
             Directory to save output rasters.
             
@@ -789,16 +832,22 @@ class StatisticalAnalyzer:
         
         Parameters
         ----------
+        
         geometry_path : str or Path
             Path to shapefile or GeoJSON with zones.
+        
         start_year : int
             Start year.
+        
         end_year : int
             End year.
+        
         months : list of int, optional
             Months to include. If None, includes all available.
+        
         stats : list of str, optional
             Statistics to calculate: 'mean', 'sum', 'min', 'max', 'std', 'count'.
+        
         output_path : str or Path, optional
             Path to save CSV output.
             
@@ -862,8 +911,10 @@ class Visualizer:
     
     Parameters
     ----------
+    
     input_dir : str or Path
         Directory containing effective precipitation rasters.
+    
     pattern : str, optional
         Glob pattern for finding input files.
     """
@@ -893,21 +944,29 @@ class Visualizer:
         
         Parameters
         ----------
+        
         start_year : int
             Start year.
+        
         end_year : int
             End year.
+        
         months : list of int, optional
             Months to include. If None, includes all.
+        
         geometry_path : str or Path, optional
             Path to geometry for spatial averaging. If None, uses entire raster.
+        
         stat : str, optional
             Statistic for spatial aggregation: 'mean', 'sum', 'min', 'max'.
             Default is 'mean'.
+        
         title : str, optional
             Plot title.
+        
         output_path : str or Path, optional
             Path to save figure.
+        
         figsize : tuple, optional
             Figure size (width, height) in inches.
             
@@ -984,16 +1043,22 @@ class Visualizer:
         
         Parameters
         ----------
+        
         start_year : int
             Climatology start year.
+        
         end_year : int
             Climatology end year.
+        
         stat : str, optional
             Statistic: 'mean', 'sum'. Default is 'mean'.
+        
         title : str, optional
             Plot title.
+        
         output_path : str or Path, optional
             Path to save figure.
+        
         figsize : tuple, optional
             Figure size.
             
@@ -1064,18 +1129,25 @@ class Visualizer:
         
         Parameters
         ----------
+        
         year : int
             Year.
+        
         month : int
             Month (1-12).
+        
         cmap : str, optional
             Colormap name. Default is 'YlGnBu'.
+        
         title : str, optional
             Plot title.
+        
         output_path : str or Path, optional
             Path to save figure.
+        
         figsize : tuple, optional
             Figure size.
+        
         vmin, vmax : float, optional
             Color scale limits.
             
@@ -1126,18 +1198,25 @@ class Visualizer:
         
         Parameters
         ----------
+        
         year : int
             Year.
+        
         month : int
             Month (1-12).
+        
         cmap : str, optional
             Colormap name. Default is 'YlGnBu'.
+        
         title : str, optional
             Map title.
+        
         output_path : str or Path, optional
             Path to save HTML file.
+        
         zoom_start : int, optional
             Initial zoom level. Default is 6.
+        
         opacity : float, optional
             Raster layer opacity (0-1). Default is 0.7.
             
@@ -1245,24 +1324,34 @@ class Visualizer:
         
         Parameters
         ----------
+        
         year : int
             Year.
+        
         month : int
             Month (1-12).
+        
         other_dir : str or Path
             Directory containing the second dataset.
+        
         other_pattern : str, optional
             Glob pattern for the second dataset.
+        
         labels : tuple of str, optional
             Labels for the two datasets.
+        
         cmap : str, optional
             Colormap for the datasets. Default is 'YlGnBu'.
+        
         diff_cmap : str, optional
             Colormap for the difference. Default is 'RdBu'.
+        
         title : str, optional
             Overall plot title.
+        
         output_path : str or Path, optional
             Path to save figure.
+        
         figsize : tuple, optional
             Figure size.
             
@@ -1360,24 +1449,34 @@ class Visualizer:
         
         Parameters
         ----------
+        
         start_year : int
             Start year.
+        
         end_year : int
             End year.
+        
         other_dir : str or Path
             Directory containing the second dataset.
+        
         other_pattern : str, optional
             Glob pattern for the second dataset.
+        
         labels : tuple of str, optional
             Labels for the two datasets.
+        
         months : list of int, optional
             Months to include. If None, includes all.
+        
         sample_size : int, optional
             Number of random pixels to sample for scatter plot.
+        
         title : str, optional
             Plot title.
+        
         output_path : str or Path, optional
             Path to save figure.
+        
         figsize : tuple, optional
             Figure size.
             
@@ -1489,22 +1588,31 @@ class Visualizer:
         
         Parameters
         ----------
+        
         start_year : int
             Start year.
+        
         end_year : int
             End year.
+        
         other_dir : str or Path
             Directory containing the second dataset.
+        
         other_pattern : str, optional
             Glob pattern for the second dataset.
+        
         labels : tuple of str, optional
             Labels for the two datasets.
+        
         stat : str, optional
             Spatial statistic: 'mean', 'sum'. Default is 'mean'.
+        
         title : str, optional
             Plot title.
+        
         output_path : str or Path, optional
             Path to save figure.
+        
         figsize : tuple, optional
             Figure size.
             
@@ -1589,16 +1697,22 @@ class Visualizer:
         
         Parameters
         ----------
+        
         anomaly_path : str or Path
             Path to the anomaly GeoTIFF file.
+        
         cmap : str, optional
             Colormap name. Default is 'RdBu' (red=dry, blue=wet).
+        
         title : str, optional
             Plot title.
+        
         output_path : str or Path, optional
             Path to save figure.
+        
         figsize : tuple, optional
             Figure size (width, height) in inches.
+        
         center_value : float, optional
             Center value for the diverging colormap. Default is 100 (for percent).
             
@@ -1660,16 +1774,22 @@ class Visualizer:
         
         Parameters
         ----------
+        
         climatology_path : str or Path
             Path to the climatology GeoTIFF file.
+        
         cmap : str, optional
             Colormap name. Default is 'YlGnBu'.
+        
         title : str, optional
             Plot title.
+        
         output_path : str or Path, optional
             Path to save figure.
+        
         figsize : tuple, optional
             Figure size (width, height) in inches.
+        
         vmin, vmax : float, optional
             Color scale limits.
             
@@ -1725,20 +1845,28 @@ class Visualizer:
         
         Parameters
         ----------
+        
         slope_path : str or Path
             Path to the slope (trend) GeoTIFF file.
+        
         pvalue_path : str or Path, optional
             Path to the p-value GeoTIFF file for significance overlay.
+        
         cmap : str, optional
             Colormap name. Default is 'RdBu' (red=decreasing, blue=increasing).
+        
         title : str, optional
             Plot title.
+        
         output_path : str or Path, optional
             Path to save figure.
+        
         figsize : tuple, optional
             Figure size (width, height) in inches.
+        
         show_significance : bool, optional
             Whether to overlay significance stippling. Default is True.
+        
         significance_level : float, optional
             P-value threshold for significance. Default is 0.05.
             
@@ -1814,14 +1942,19 @@ class Visualizer:
         
         Parameters
         ----------
+        
         slope_path : str or Path
             Path to the slope (trend) GeoTIFF file.
+        
         pvalue_path : str or Path
             Path to the p-value GeoTIFF file.
+        
         title : str, optional
             Overall figure title (used for slope panel).
+        
         output_path : str or Path, optional
             Path to save figure.
+        
         figsize : tuple, optional
             Figure size (width, height) in inches.
             
@@ -1895,14 +2028,19 @@ def export_to_netcdf(
     
     Parameters
     ----------
+    
     input_dir : str or Path
         Directory containing monthly rasters.
+    
     output_path : str or Path
         Output NetCDF file path.
+    
     pattern : str, optional
         Glob pattern for finding input files.
+    
     variable_name : str, optional
         Name for the variable in NetCDF.
+    
     compression : bool, optional
         Whether to compress the output. Default is True.
     """
@@ -1976,10 +2114,13 @@ def export_to_cog(
     
     Parameters
     ----------
+    
     input_path : str or Path
         Input GeoTIFF path.
+    
     output_path : str or Path
         Output COG path.
+    
     overview_levels : list of int, optional
         Overview levels to create.
     """
