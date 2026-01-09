@@ -3,9 +3,16 @@
 **A Python Package for Computing Effective Precipitation Using Google Earth Engine Climate Data**
 
 [![Release](https://img.shields.io/badge/release-v1.0.1-green.svg)](https://github.com/montimaj/pyCropWat/releases)
+[![PyPI](https://img.shields.io/pypi/v/pycropwat.svg)](https://pypi.org/project/pycropwat/)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://montimaj.github.io/pyCropWat)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+
+## Quick Install
+
+```bash
+pip install pycropwat
+```
 
 ## Overview
 
