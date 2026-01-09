@@ -211,3 +211,6 @@ __marimo__/
 .DS_Store
 *.pdf
 javascripts/
+# Large data files (GitHub 100MB limit)
+*.nc
+Examples/**/analysis_outputs/

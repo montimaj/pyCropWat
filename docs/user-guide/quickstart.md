@@ -383,7 +383,7 @@ outputs/
 
 ## Next Steps
 
-- **Try the Complete Workflow Example**: Run `python Examples/complete_workflow_example.py --analysis-only` to see all features in action using real Rio de la Plata basin data
+- **Try the Complete Workflow Example**: Run `python Examples/south_america_cropwat_example.py --analysis-only` to see all features in action using real Rio de la Plata basin data
 - See [CLI Reference](cli.md) for complete command documentation
 - See [Python API](api.md) for advanced programmatic usage
 - See [Examples](../examples.md) for real-world use cases including the [Complete Workflow](../examples.md#example-12-complete-workflow)

@@ -455,6 +455,37 @@ viz.plot_interactive_map(
     basemap='OpenStreetMap',
     output_path='./interactive_map.html'
 )
+
+# Anomaly map from GeoTIFF (diverging colormap, centered at 100%)
+fig = viz.plot_anomaly_map(
+    anomaly_path='./analysis_outputs/anomalies/ERA5Land/anomaly_2023_08.tif',
+    title='Peff Anomaly - August 2023 (% of Climatology)',
+    output_path='./anomaly_map_2023_08.png'
+)
+
+# Climatology map from GeoTIFF
+fig = viz.plot_climatology_map(
+    climatology_path='./analysis_outputs/climatology/ERA5Land/climatology_06.tif',
+    title='Peff Climatology - June (2000-2020)',
+    output_path='./climatology_map_06.png'
+)
+
+# Trend map with significance stippling
+fig = viz.plot_trend_map(
+    slope_path='./analysis_outputs/trend/ERA5Land/slope.tif',
+    pvalue_path='./analysis_outputs/trend/ERA5Land/pvalue.tif',
+    title='Peff Trend (2000-2023)',
+    show_significance=True,  # Adds stippling for p < 0.05
+    output_path='./trend_map.png'
+)
+
+# Trend panel (slope and p-value side-by-side)
+fig = viz.plot_trend_panel(
+    slope_path='./analysis_outputs/trend/ERA5Land/slope.tif',
+    pvalue_path='./analysis_outputs/trend/ERA5Land/pvalue.tif',
+    title='Peff Trend Analysis (2000-2023)',
+    output_path='./trend_panel.png'
+)
 ```
 
 **CLI:**
@@ -646,16 +677,27 @@ done
 
 A complete analysis workflow from data processing to visualization.
 
-!!! tip "Ready-to-Run Script"
-    A comprehensive, ready-to-run version of this workflow is available at `Examples/complete_workflow_example.py`. 
-    This script uses real Rio de la Plata basin data and demonstrates all pyCropWat features including dataset comparison.
-
+!!! tip "Ready-to-Run Scripts"
+    Comprehensive workflow scripts are available in the `Examples/` directory:
+    
+    **South America (Rio de la Plata):** [`Examples/south_america_cropwat_example.py`](https://github.com/montimaj/pyCropWat/blob/main/Examples/south_america_cropwat_example.py)
+    
     ```bash
     # Run with existing data (analysis only)
-    python Examples/complete_workflow_example.py --analysis-only
+    python Examples/south_america_cropwat_example.py --analysis-only
     
     # Run full workflow with GEE processing
-    python Examples/complete_workflow_example.py --gee-project your-project-id
+    python Examples/south_america_cropwat_example.py --gee-project your-project-id --workers 8
+    ```
+    
+    **Arizona (USDA-SCS Method):** [`Examples/arizona_usda_scs_example.py`](https://github.com/montimaj/pyCropWat/blob/main/Examples/arizona_usda_scs_example.py)
+    
+    ```bash
+    # Run with existing data (analysis only)
+    python Examples/arizona_usda_scs_example.py --analysis-only
+    
+    # Run full workflow with GEE processing
+    python Examples/arizona_usda_scs_example.py --gee-project your-project-id --workers 8
     ```
 
 ```python
@@ -781,16 +823,212 @@ The complete workflow example generates the following visualizations using real 
 
 *Zonal statistics comparison between ERA5-Land and TerraClimate for Eastern and Western Rio de la Plata regions.*
 
+#### Anomaly, Climatology & Trend Maps
+
+<p align="center">
+  <img src="../assets/examples/figures/ERA5Land/anomaly_map_2023_01.png" width="32%" alt="Anomaly Map">
+  <img src="../assets/examples/figures/ERA5Land/climatology_map_01.png" width="32%" alt="Climatology Map">
+  <img src="../assets/examples/figures/ERA5Land/trend_map_with_significance.png" width="32%" alt="Trend Map">
+</p>
+
+*Left: Percent anomaly for January 2023 (diverging colormap centered at 100%). Center: January climatology (2000-2020). Right: Long-term trend with significance stippling (p < 0.05).*
+
+<p align="center">
+  <img src="../assets/examples/figures/ERA5Land/trend_maps.png" width="70%" alt="Trend Panel">
+</p>
+
+*Trend analysis panel showing slope (mm/year) and p-value maps side by side.*
+
 #### Method Comparison
 
 <p align="center">
   <img src="../assets/examples/method_comparison/ERA5Land_method_maps_2020_01.png" width="100%" alt="Method Comparison Maps">
 </p>
 
-*Comparison of effective precipitation methods: CROPWAT, FAO/AGLW, Fixed Percentage (70%), and Dependable Rainfall (75%).*
+*Comparison of effective precipitation methods: CROPWAT, FAO/AGLW, Fixed Percentage (70%), Dependable Rainfall (75%), and FarmWest.*
 
 <p align="center">
   <img src="../assets/examples/method_comparison/ERA5Land_method_curves.png" width="60%" alt="Method Curves">
 </p>
 
 *Theoretical response curves for different effective precipitation methods.*
+
+---
+
+## Arizona USDA-SCS Example
+
+This example demonstrates the **USDA-SCS method** for calculating effective precipitation using U.S.-specific datasets for Arizona, with comparisons to global datasets and multiple Peff methods.
+
+!!! tip "Ready-to-Run Script"
+    A comprehensive Arizona workflow is available at [`Examples/arizona_usda_scs_example.py`](https://github.com/montimaj/pyCropWat/blob/main/Examples/arizona_usda_scs_example.py):
+    
+    ```bash
+    # Run with existing data
+    python Examples/arizona_usda_scs_example.py --analysis-only
+    
+    # Run full workflow with GEE processing
+    python Examples/arizona_usda_scs_example.py --gee-project your-project-id
+    ```
+
+### Dataset Configuration
+
+The Arizona example processes **4 precipitation datasets** (2 U.S., 2 Global):
+
+| Dataset | Type | GEE Asset ID | Band | Resolution |
+|---------|------|-------------|------|------------|
+| **GridMET** | U.S. | `IDAHO_EPSCOR/GRIDMET` | `pr` | ~4 km |
+| **PRISM** | U.S. | `projects/sat-io/open-datasets/OREGONSTATE/PRISM_800_MONTHLY` | `ppt` | ~800 m |
+| **ERA5-Land** | Global | `ECMWF/ERA5_LAND/MONTHLY_AGGR` | `total_precipitation_sum` | ~11 km |
+| **TerraClimate** | Global | `IDAHO_EPSCOR/TERRACLIMATE` | `pr` | ~4 km |
+
+For **USDA-SCS method**, dataset-specific AWC and ETo are used:
+
+**U.S. Datasets (High-Resolution):**
+
+| Dataset | GEE Asset ID | Description |
+|---------|-------------|-------------|
+| **AWC (SSURGO)** | `projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite` | USDA SSURGO soil water holding capacity |
+| **ETo (GridMET)** | `projects/openet/assets/reference_et/conus/gridmet/monthly/v1` | OpenET GridMET reference ET (band: `eto`) |
+
+**Global Datasets:**
+
+| Dataset | GEE Asset ID | Description |
+|---------|-------------|-------------|
+| **AWC (FAO HWSD)** | `projects/sat-io/open-datasets/FAO/HWSD_V2_SMU` | FAO Harmonized World Soil Database v2 (band: `AWC`) |
+| **ETo (AgERA5)** | `projects/climate-engine-pro/assets/ce-ag-era5-v2/daily` | AgERA5 FAO-56 Penman-Monteith ETo (band: `ReferenceET_PenmanMonteith_FAO56`) |
+
+### Python Example
+
+```python
+from pycropwat import EffectivePrecipitation
+
+# Arizona with GridMET precipitation and USDA-SCS method
+ep = EffectivePrecipitation(
+    asset_id='IDAHO_EPSCOR/GRIDMET',
+    precip_band='pr',
+    gee_geometry_asset='users/montimajumdar/AZ',
+    start_year=2000,
+    end_year=2024,
+    scale=4000,  # 4km resolution
+    # USDA-SCS specific parameters
+    method='usda_scs',
+    awc_asset='projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite',
+    eto_asset='projects/openet/assets/reference_et/conus/gridmet/monthly/v1',
+    eto_band='eto',
+    rooting_depth=1.0  # 1 meter
+)
+
+ep.process(output_dir='./Arizona/AZ_GridMET_USDA_SCS', n_workers=8)
+```
+
+### CLI Example
+
+```bash
+# GridMET precipitation with USDA-SCS method for Arizona
+pycropwat process --asset IDAHO_EPSCOR/GRIDMET --band pr \
+    --gee-geometry users/montimajumdar/AZ \
+    --start-year 2000 --end-year 2024 --scale 4000 \
+    --method usda_scs \
+    --awc-asset projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite \
+    --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \
+    --eto-band eto --rooting-depth 1.0 \
+    --workers 8 --output ./Arizona/AZ_GridMET_USDA_SCS
+
+# PRISM precipitation (higher resolution ~800m)
+pycropwat process --asset projects/sat-io/open-datasets/OREGONSTATE/PRISM_800_MONTHLY --band ppt \
+    --gee-geometry users/montimajumdar/AZ \
+    --start-year 2000 --end-year 2024 --scale 4000 \
+    --method usda_scs \
+    --awc-asset projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite \
+    --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \
+    --eto-band eto --rooting-depth 1.0 \
+    --workers 8 --output ./Arizona/AZ_PRISM_USDA_SCS
+```
+
+### Key Features
+
+- **USDA-SCS Method**: Accounts for soil water holding capacity (AWC) and evaporative demand (ETo)
+- **U.S. High-Resolution Data**: GridMET (~4km) and PRISM (~800m) precipitation with SSURGO AWC and GridMET ETo
+- **Global Coverage Data**: ERA5-Land and TerraClimate with FAO HWSD AWC and AgERA5 ETo
+- **ETo Scale Factor**: Support for different ETo units via `eto_scale_factor` parameter
+- **U.S. vs Global Comparison**: Compare U.S. datasets (GridMET, PRISM) against global datasets (ERA5-Land, TerraClimate)
+- **Method Comparison**: Compare all 6 Peff methods (CROPWAT, FAO/AGLW, Fixed %, Dependable Rain, FarmWest, USDA-SCS)
+- **Arizona-Specific Analysis**: Monsoon season (Jul-Sep), winter season aggregations
+- **Regional Zones**: Central AZ (Phoenix), Southern AZ (Tucson), Northern AZ (Flagstaff)
+
+### Generated Outputs
+
+The workflow generates comprehensive analysis outputs:
+
+```
+Examples/Arizona/
+├── AZ_GridMET_USDA_SCS/    # U.S. dataset outputs
+├── AZ_PRISM_USDA_SCS/
+├── AZ_ERA5Land_USDA_SCS/   # Global dataset outputs
+├── AZ_TerraClimate_USDA_SCS/
+└── analysis_outputs/
+    ├── annual/             # Temporal aggregations
+    ├── climatology/
+    ├── anomalies/          # Statistical analysis & CSV exports
+    ├── trend/
+    ├── figures/            # Raster maps & time series plots
+    ├── comparisons/
+    ├── zonal_stats/
+    ├── us_vs_global/       # U.S. vs Global dataset comparison
+    │   ├── us_global_spatial_*.png
+    │   ├── multi_dataset_summary.png
+    │   └── dataset_statistics.csv
+    ├── method_comparison/  # All 6 methods comparison
+    │   ├── method_spatial_*.png
+    │   ├── method_curves_arizona.png
+    │   ├── method_comparison_summary.png
+    │   └── method_statistics.csv
+    ├── az_zones.geojson
+    └── *_usda_scs_peff_2000_2024.nc
+```
+
+### Arizona Example Outputs
+
+The Arizona workflow generates the following visualizations:
+
+#### Time Series & Climatology
+
+<p align="center">
+  <img src="../assets/examples/arizona/figures/GridMET/time_series.png" width="48%" alt="Arizona Time Series">
+  <img src="../assets/examples/arizona/figures/GridMET/monthly_climatology.png" width="48%" alt="Arizona Climatology">
+</p>
+
+*GridMET USDA-SCS effective precipitation for Arizona: time series (left) and monthly climatology (right).*
+
+#### Anomaly, Climatology & Trend Maps
+
+<p align="center">
+  <img src="../assets/examples/arizona/figures/GridMET/anomaly_map_2023_08.png" width="32%" alt="Arizona Anomaly">
+  <img src="../assets/examples/arizona/figures/GridMET/climatology_map_08.png" width="32%" alt="Arizona Climatology Map">
+  <img src="../assets/examples/arizona/figures/GridMET/trend_map_with_significance.png" width="32%" alt="Arizona Trend">
+</p>
+
+*Left: August 2023 anomaly (monsoon season). Center: August climatology (monsoon peak). Right: Long-term trend with significance stippling (p < 0.05).*
+
+<p align="center">
+  <img src="../assets/examples/arizona/figures/GridMET/trend_maps.png" width="70%" alt="Arizona Trend Panel">
+</p>
+
+*Trend analysis panel for Arizona showing slope (mm/year) and p-value maps side by side.*
+
+#### U.S. vs Global Dataset Comparison
+
+<p align="center">
+  <img src="../assets/examples/arizona/us_vs_global/multi_dataset_summary.png" width="70%" alt="U.S. vs Global">
+</p>
+
+*Comparison of U.S. datasets (GridMET, PRISM) vs Global datasets (ERA5-Land, TerraClimate) for Arizona.*
+
+#### Method Comparison
+
+<p align="center">
+  <img src="../assets/examples/arizona/method_comparison/method_curves_arizona.png" width="60%" alt="Arizona Method Curves">
+</p>
+
+*Theoretical Peff response curves for Arizona conditions (AWC=150 mm/m, ETo=180 mm/month).*
+

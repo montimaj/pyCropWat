@@ -12,7 +12,7 @@
 pyCropWat is a Python package that calculates effective precipitation using multiple methodologies from any Google Earth Engine (GEE) climate dataset. It supports:
 
 - **Multiple GEE datasets**: ERA5-Land, TerraClimate, CHIRPS, GPM IMERG, and more
-- **Multiple Peff methods**: CROPWAT (USDA SCS), FAO/AGLW, Fixed Percentage, Dependable Rainfall
+- **Multiple Peff methods**: CROPWAT (USDA SCS), FAO/AGLW, Fixed Percentage, Dependable Rainfall, FarmWest, USDA-SCS
 - **Flexible geometry inputs**: Shapefiles, GeoJSON, or GEE FeatureCollection assets
 - **Automatic chunked downloads**: Handles large regions that exceed GEE pixel limits
 - **Temporal aggregation**: Annual, seasonal, growing season, climatology
@@ -111,6 +111,64 @@ ep = EffectivePrecipitation(..., method='dependable_rainfall', method_params={'p
 
 ---
 
+### 5. FarmWest
+
+A simple empirical formula used by Washington State University's FarmWest program for irrigation scheduling in the Pacific Northwest.
+
+$$P_{eff} = \max((P - 5) \times 0.75, 0)$$
+
+The method assumes the first 5 mm is lost to interception/evaporation, and 75% of the remaining precipitation is effective.
+
+**Usage:**
+```python
+ep = EffectivePrecipitation(..., method='farmwest')
+```
+
+**Reference:** FarmWest. [Effective Precipitation](https://farmwest.com/climate/calculator-information/et/effective-precipitation/). Washington State University.
+
+---
+
+### 6. USDA-SCS (with AWC and ETo)
+
+The USDA Soil Conservation Service method that accounts for soil water holding capacity (AWC) and reference evapotranspiration (ETo). This method is more site-specific than other methods.
+
+**Formula:**
+
+1. Soil storage depth: $d = AWC \times 0.5 \times D_{root}$ (in inches)
+2. Storage factor: $sf = 0.531747 + 0.295164 \cdot d - 0.057697 \cdot d^2 + 0.003804 \cdot d^3$
+3. Effective precipitation: $P_{eff} = sf \times (P^{0.82416} \times 0.70917 - 0.11556) \times 10^{ET_o \times 0.02426}$
+4. Clamped: $P_{eff} = \min(P_{eff}, P, ET_o)$, $P_{eff} \geq 0$
+
+**Required GEE Assets:**
+
+| Region | AWC Asset | ETo Asset |
+|--------|-----------|----------|
+| **U.S.** | `projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite` | `projects/openet/assets/reference_et/conus/gridmet/monthly/v1` |
+| **Global** | `projects/sat-io/open-datasets/FAO/HWSD_V2_SMU` | `projects/climate-engine-pro/assets/ce-ag-era5-v2/daily` |
+
+**Usage (CLI - U.S.):**
+```bash
+pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitation_sum \\
+    --method usda_scs \\
+    --awc-asset projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite \\
+    --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \\
+    --eto-band eto --rooting-depth 1.0 ...
+```
+
+**Usage (CLI - Global):**
+```bash
+pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitation_sum \\
+    --method usda_scs \\
+    --awc-asset projects/sat-io/open-datasets/FAO/HWSD_V2_SMU --awc-band AWC \\
+    --eto-asset projects/climate-engine-pro/assets/ce-ag-era5-v2/daily \\
+    --eto-band ReferenceET_PenmanMonteith_FAO56 --eto-is-daily \\
+    --rooting-depth 1.0 ...
+```
+
+**Reference:** USDA SCS. (1993). [Chapter 2 Irrigation Water Requirements](https://www.wcc.nrcs.usda.gov/ftpref/wntsc/waterMgt/irrigation/NEH15/ch2.pdf). In Part 623 National Engineering Handbook. USDA Soil Conservation Service.
+
+---
+
 ### Method Comparison
 
 | Method | Use Case | Characteristics |
@@ -119,12 +177,16 @@ ep = EffectivePrecipitation(..., method='dependable_rainfall', method_params={'p
 | **FAO/AGLW** | Yield response studies | Similar to CROPWAT, slightly different curve |
 | **Fixed Percentage** | Quick estimates, calibration | Simple, requires local calibration |
 | **Dependable Rainfall** | Risk-averse planning | Conservative, probability-based |
+| **FarmWest** | Pacific Northwest irrigation | Simple, accounts for interception loss |
+| **USDA-SCS** | Site-specific irrigation | Accounts for soil AWC and ETo |
 
 !!! tip "Choosing a Method"
     - Use **CROPWAT** (default) for most irrigation planning applications
     - Use **FAO/AGLW** when following FAO Irrigation Paper No. 33 guidelines
     - Use **Fixed Percentage** when you have locally calibrated effectiveness values
     - Use **Dependable Rainfall** for drought-sensitive crops or risk-averse planning
+    - Use **FarmWest** for Pacific Northwest regions or when accounting for interception loss
+    - Use **USDA-SCS** when soil AWC and ETo data are available for site-specific estimates
 
 ## Quick Start
 
@@ -185,7 +247,7 @@ viz.plot_time_series(2020, 2023, output_path='./timeseries.png')
 
 ### ✅ Implemented
 
-- 📊 **Multiple Peff methods**: CROPWAT, FAO/AGLW, Fixed Percentage, Dependable Rainfall
+- 📊 **Multiple Peff methods**: CROPWAT, FAO/AGLW, Fixed Percentage, Dependable Rainfall, FarmWest, USDA-SCS
 - 🗓️ **Temporal aggregation**: Annual, seasonal, growing season, climatology
 - 📈 **Statistical analysis**: Anomaly detection, trend analysis (linear, Theil-Sen), zonal statistics
 - 📉 **Visualization**: Time series, climatology charts, maps, interactive HTML maps, dataset comparison (side-by-side, scatter, annual)
@@ -246,13 +308,44 @@ The following visualizations are generated by the [complete workflow example](ex
   <img src="assets/examples/method_comparison/ERA5Land_method_maps_2020_01.png" width="100%" alt="Method Comparison Maps">
 </p>
 
-*Comparison of effective precipitation methods: CROPWAT, FAO/AGLW, Fixed Percentage (70%), and Dependable Rainfall (75%).*
+*Comparison of effective precipitation methods: CROPWAT, FAO/AGLW, Fixed Percentage (70%), Dependable Rainfall (75%), and FarmWest.*
 
 <p align="center">
   <img src="assets/examples/method_comparison/ERA5Land_method_curves.png" width="60%" alt="Method Curves">
 </p>
 
 *Theoretical response curves for different effective precipitation methods.*
+
+### Anomaly, Climatology & Trend Maps
+
+<p align="center">
+  <img src="assets/examples/figures/ERA5Land/anomaly_map_2023_01.png" width="32%" alt="Anomaly Map">
+  <img src="assets/examples/figures/ERA5Land/climatology_map_01.png" width="32%" alt="Climatology Map">
+  <img src="assets/examples/figures/ERA5Land/trend_map_with_significance.png" width="32%" alt="Trend Map">
+</p>
+
+*Left: Percent anomaly (January 2023). Center: January climatology (2000-2020). Right: Long-term trend with significance stippling (p < 0.05).*
+
+---
+
+### Arizona Example (USDA-SCS Method)
+
+The [Arizona workflow](examples.md#arizona-usda-scs-example) demonstrates U.S.-specific datasets with the USDA-SCS method:
+
+<p align="center">
+  <img src="assets/examples/arizona/figures/GridMET/time_series.png" width="48%" alt="Arizona Time Series">
+  <img src="assets/examples/arizona/figures/GridMET/monthly_climatology.png" width="48%" alt="Arizona Climatology">
+</p>
+
+*GridMET USDA-SCS effective precipitation for Arizona: time series (left) and monthly climatology (right).*
+
+<p align="center">
+  <img src="assets/examples/arizona/figures/GridMET/anomaly_map_2023_08.png" width="32%" alt="Arizona Anomaly">
+  <img src="assets/examples/arizona/figures/GridMET/climatology_map_08.png" width="32%" alt="Arizona Climatology Map">
+  <img src="assets/examples/arizona/figures/GridMET/trend_map_with_significance.png" width="32%" alt="Arizona Trend">
+</p>
+
+*Left: August 2023 anomaly (monsoon). Center: August climatology. Right: Long-term trend with significance stippling.*
 
 ## Documentation
 
@@ -264,13 +357,59 @@ For full documentation, visit [https://montimaj.github.io/pyCropWat](https://mon
 - [Examples](examples.md)
 - [Complete Workflow Example](examples.md#example-12-complete-workflow) - A comprehensive script demonstrating all features
 
-!!! tip "Try the Complete Workflow Example"
-    The `Examples/complete_workflow_example.py` script provides a ready-to-run demonstration of all pyCropWat features using real Rio de la Plata basin data:
+!!! tip "Try the Complete Workflow Examples"
+    The `Examples/` directory provides ready-to-run demonstrations:
     
+    **Rio de la Plata Example (Global datasets):**
     ```bash
-    # Run with existing sample data
-    python Examples/complete_workflow_example.py --analysis-only
+    # Analysis only (using existing data)
+    python Examples/south_america_cropwat_example.py --analysis-only
+    
+    # Full workflow with GEE processing
+    python Examples/south_america_cropwat_example.py --gee-project your-project-id --workers 8
     ```
+    
+    **Arizona USDA-SCS Example (U.S. datasets):**
+    ```bash
+    # Analysis only (using existing data)
+    python Examples/arizona_usda_scs_example.py --analysis-only
+    
+    # Full workflow with GEE processing
+    python Examples/arizona_usda_scs_example.py --gee-project your-project-id --workers 8
+    ```
+
+## U.S.-Specific Datasets
+
+For U.S.-based applications, pyCropWat supports high-resolution precipitation and the USDA-SCS method:
+
+### Precipitation Datasets
+
+| Dataset | Asset ID | Band | Resolution |
+|---------|----------|------|------------|
+| **GridMET** | `IDAHO_EPSCOR/GRIDMET` | `pr` | ~4 km |
+| **PRISM** | `projects/sat-io/open-datasets/OREGONSTATE/PRISM_800_MONTHLY` | `ppt` | ~800 m |
+
+### USDA-SCS Required Assets
+
+| Dataset | Asset ID | Band | Description |
+|---------|----------|------|-------------|
+| **AWC (SSURGO)** | `projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite` | (single) | USDA SSURGO soil data |
+| **ETo (GridMET)** | `projects/openet/assets/reference_et/conus/gridmet/monthly/v1` | `eto` | OpenET GridMET monthly ETo |
+
+### Example: Arizona with USDA-SCS
+
+```bash
+pycropwat process --asset IDAHO_EPSCOR/GRIDMET --band pr \
+    --gee-geometry users/montimajumdar/AZ \
+    --start-year 2000 --end-year 2024 --scale 4000 \
+    --method usda_scs \
+    --awc-asset projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite \
+    --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \
+    --eto-band eto --rooting-depth 1.0 \
+    --output ./AZ_GridMET_USDA_SCS
+```
+
+See [Examples](examples.md#arizona-usda-scs-example) for the complete Arizona workflow script.
 
 ## Funding
 
