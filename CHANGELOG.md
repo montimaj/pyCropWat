@@ -2,6 +2,14 @@
 
 All notable changes to pyCropWat will be documented in this file.
 
+## [1.0.4] - 2026-01-09
+
+### 📦 Package & Distribution
+- Added animated logo with PNG fallback for PyPI compatibility
+- Added PyPI downloads and GitHub stars badges
+
+---
+
 ## [1.0.3] - 2026-01-09
 
 ### 📦 Package & Distribution

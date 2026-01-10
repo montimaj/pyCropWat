@@ -1,6 +1,6 @@
 # pyCropWat
 
-[![Release](https://img.shields.io/badge/release-v1.0.3-green.svg)](https://github.com/montimaj/pyCropWat/releases)
+[![Release](https://img.shields.io/badge/release-v1.0.4-green.svg)](https://github.com/montimaj/pyCropWat/releases)
 [![PyPI](https://img.shields.io/pypi/v/pycropwat.svg)](https://pypi.org/project/pycropwat/)
 [![PyPI Downloads](https://img.shields.io/pypi/dm/pycropwat)](https://pypi.org/project/pycropwat/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18201620.svg)](https://doi.org/10.5281/zenodo.18201620)
@@ -15,7 +15,7 @@ A Python Package for Computing Effective Precipitation Using Google Earth Engine
 <p align="center">
   <picture>
     <source srcset="https://raw.githubusercontent.com/montimaj/pyCropWat/main/docs/assets/pyCropWat.gif" type="image/gif">
-    <img src="https://raw.githubusercontent.com/montimaj/pyCropWat/main/docs/assets/pyCropWat.png" alt="pyCropWat Logo" width="300">
+    <img src="https://raw.githubusercontent.com/montimaj/pyCropWat/main/docs/assets/pyCropWat.png" alt="pyCropWat Logo">
   </picture>
 </p>
 
