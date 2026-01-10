@@ -1,7 +1,14 @@
 # pyCropWat
 
-[![Release](https://img.shields.io/badge/release-v1.0.2-green.svg)](https://github.com/montimaj/pyCropWat/releases)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/montimaj/pyCropWat/main/docs/assets/pyCropWat.gif" alt="pyCropWat Logo" width="300">
+</p>
+
+[![Release](https://img.shields.io/badge/release-v1.0.3-green.svg)](https://github.com/montimaj/pyCropWat/releases)
 [![PyPI](https://img.shields.io/pypi/v/pycropwat.svg)](https://pypi.org/project/pycropwat/)
+[![Downloads](https://static.pepy.tech/badge/pycropwat)](https://pepy.tech/project/pycropwat)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18201620.svg)](https://doi.org/10.5281/zenodo.18201620)
+[![GitHub stars](https://img.shields.io/github/stars/montimaj/pyCropWat)](https://github.com/montimaj/pyCropWat/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://montimaj.github.io/pyCropWat)
@@ -78,7 +85,7 @@ pyCropWat/
 - **`AZ.geojson`**: Arizona boundary GeoJSON for local geometry support.
 - **Sample output rasters**: Monthly TerraClimate and ERA5-Land-based effective precipitation and effective precipitation fraction TIF files (2000-2025) for the Rio de la Plata (RDP) region of South America.
 
-See the [Complete Workflow Example](#complete-workflow-example) section below for details.
+See the [Complete Workflow Examples](#complete-workflow-examples) section below for details.
 
 **Changelog:** See [CHANGELOG.md](https://github.com/montimaj/pyCropWat/blob/main/CHANGELOG.md) for release notes and version history.
 
@@ -86,7 +93,7 @@ See the [Complete Workflow Example](#complete-workflow-example) section below fo
 
 pyCropWat converts precipitation data from any GEE climate dataset into effective precipitation and effective precipitation fraction rasters. It supports:
 
-- Any GEE ImageCollection with precipitation data
+- Any GEE ImageCollection with precipitation data from the [GEE Data Catalog](https://developers.google.com/earth-engine/datasets) or [Community Catalog](https://gee-community-catalog.org/)
 - Shapefile, GeoJSON, or GEE FeatureCollection asset for region of interest
 - **Multiple effective precipitation methods**: CROPWAT, FAO/AGLW, Fixed Percentage, Dependable Rainfall, FarmWest, USDA-SCS
 - Parallel processing using Dask

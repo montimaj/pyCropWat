@@ -2,6 +2,8 @@
 
 This guide will help you get started with pyCropWat in minutes.
 
+pyCropWat works with any GEE ImageCollection containing precipitation data from the [GEE Data Catalog](https://developers.google.com/earth-engine/datasets) or [Community Catalog](https://gee-community-catalog.org/).
+
 ## Basic Usage
 
 ### Using the Command Line

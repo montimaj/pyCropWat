@@ -2,6 +2,13 @@
 
 All notable changes to pyCropWat will be documented in this file.
 
+## [1.0.3] - 2026-01-09
+
+### 📦 Package & Distribution
+- Added Zenodo DOI badge to README and documentation
+
+---
+
 ## [1.0.2] - 2026-01-09
 
 ### 📦 Package & Distribution

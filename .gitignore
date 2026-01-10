@@ -214,3 +214,5 @@ javascripts/
 # Large data files (GitHub 100MB limit)
 *.nc
 # Examples/**/analysis_outputs/
+*.pdf
+*.pptx

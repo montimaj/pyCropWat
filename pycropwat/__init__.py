@@ -87,7 +87,7 @@ from .analysis import (
     export_to_cog,
 )
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 __all__ = [
     # Core
     "EffectivePrecipitation",
