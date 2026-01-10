@@ -13,7 +13,10 @@
 A Python Package for Computing Effective Precipitation Using Google Earth Engine Climate Data.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/montimaj/pyCropWat/main/docs/assets/pyCropWat.gif" alt="pyCropWat Logo">
+  <picture>
+    <source srcset="https://raw.githubusercontent.com/montimaj/pyCropWat/main/docs/assets/pyCropWat.gif" type="image/gif">
+    <img src="https://raw.githubusercontent.com/montimaj/pyCropWat/main/docs/assets/pyCropWat.png" alt="pyCropWat Logo" width="300">
+  </picture>
 </p>
 
 ## Project Structure
