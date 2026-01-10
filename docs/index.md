@@ -1,19 +1,19 @@
 # pyCropWat
 
-<p align="center">
-  <img src="assets/pyCropWat.gif" alt="pyCropWat Logo" width="300">
-</p>
-
 **A Python Package for Computing Effective Precipitation Using Google Earth Engine Climate Data**
 
 [![Release](https://img.shields.io/badge/release-v1.0.3-green.svg)](https://github.com/montimaj/pyCropWat/releases)
 [![PyPI](https://img.shields.io/pypi/v/pycropwat.svg)](https://pypi.org/project/pycropwat/)
-[![Downloads](https://static.pepy.tech/badge/pycropwat)](https://pepy.tech/project/pycropwat)
+[![PyPI Downloads](https://img.shields.io/pypi/dm/pycropwat)](https://pypi.org/project/pycropwat/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18201620.svg)](https://doi.org/10.5281/zenodo.18201620)
 [![GitHub stars](https://img.shields.io/github/stars/montimaj/pyCropWat)](https://github.com/montimaj/pyCropWat/stargazers)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://montimaj.github.io/pyCropWat)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+
+<p align="center">
+  <img src="assets/pyCropWat.gif" alt="pyCropWat Logo">
+</p>
 
 ## Quick Install
 
