@@ -1,6 +1,6 @@
-# pyCropWat
+# py<span style="color: #4CAF50;">Crop</span><span style="color: #2196F3;">Wat</span>
 
-[![Release](https://img.shields.io/badge/release-v1.0.4-green.svg)](https://github.com/montimaj/pyCropWat/releases)
+[![Release](https://img.shields.io/badge/release-v1.0.5-green.svg)](https://github.com/montimaj/pyCropWat/releases)
 [![PyPI](https://img.shields.io/pypi/v/pycropwat.svg)](https://pypi.org/project/pycropwat/)
 [![PyPI Downloads](https://img.shields.io/pypi/dm/pycropwat)](https://pypi.org/project/pycropwat/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18201620.svg)](https://doi.org/10.5281/zenodo.18201620)
@@ -94,6 +94,10 @@ See the [Complete Workflow Examples](#complete-workflow-examples) section below 
 
 ## Overview
 
+<table>
+<tr>
+<td>
+
 pyCropWat converts precipitation data from any GEE climate dataset into effective precipitation and effective precipitation fraction rasters. It supports:
 
 - Any GEE ImageCollection with precipitation data from the [GEE Data Catalog](https://developers.google.com/earth-engine/datasets) or [Community Catalog](https://gee-community-catalog.org/)
@@ -105,6 +109,13 @@ pyCropWat converts precipitation data from any GEE climate dataset into effectiv
 - **Statistical analysis**: Climatology, anomalies, trend analysis
 - **Enhanced exports**: NetCDF, Cloud-Optimized GeoTIFF (COG), zonal statistics CSV
 - **Visualization**: Time series plots, maps, climatology charts, anomaly maps, trend maps with significance
+
+</td>
+<td width="200">
+<img src="https://raw.githubusercontent.com/montimaj/pyCropWat/main/docs/assets/pyCropWat_logo.png" alt="pyCropWat Logo" width="200">
+</td>
+</tr>
+</table>
 
 ### Effective Precipitation Methods
 

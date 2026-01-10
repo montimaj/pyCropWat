@@ -2,6 +2,14 @@
 
 All notable changes to pyCropWat will be documented in this file.
 
+## [1.0.5] - 2026-01-10
+
+### 🎨 UI/Branding
+- Updated logo styling with green "Crop" and blue "Wat" text colors
+- Added logo to Overview section in documentation and README
+
+---
+
 ## [1.0.4] - 2026-01-09
 
 ### 📦 Package & Distribution
