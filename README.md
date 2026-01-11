@@ -130,7 +130,7 @@ pyCropWat supports multiple methods for calculating effective precipitation:
 | `suet` | TAGEM-SuET method: P - ETo with 75mm threshold (requires ETo asset) |
 | `ensemble` | Ensemble mean of all methods except TAGEM-SuET - default (requires AWC and ETo assets) |
 
-### Ensemble Formula (Default)
+### CROPWAT
 
 The effective precipitation is calculated using the CROPWAT method (Smith, 1992; Muratoglu et al., 2023):
 
@@ -235,7 +235,7 @@ pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitatio
     --eto-band eto --output ./output
 ```
 
-### Ensemble Method (Mean of Methods)
+### Ensemble - Default (Mean of Methods)
 
 The ensemble method provides a robust estimate by calculating the mean of all methods except TAGEM-SuET, which has been shown to underperform in comparative analyses. The ensemble includes:
 
