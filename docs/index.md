@@ -1,4 +1,7 @@
-# py<span style="color: #4CAF50;">Crop</span><span style="color: #2196F3;">Wat</span>
+
+<p align="left">
+  <img src="assets/pyCropWat_logo.png" alt="pyCropWat Logo" width=300>
+</p>
 
 **A Python Package for Computing Effective Precipitation Using Google Earth Engine Climate Data**
 
@@ -12,7 +15,7 @@
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
 <p align="center">
-  <img src="assets/pyCropWat.gif" alt="pyCropWat Logo">
+  <img src="assets/pyCropWat.gif" alt="pyCropWat Demo">
 </p>
 
 ## Quick Install
@@ -22,8 +25,6 @@ pip install pycropwat
 ```
 
 ## Overview
-
-<img src="assets/pyCropWat_logo.png" alt="pyCropWat Logo" width="200" align="right" style="margin-left: 20px;">
 
 pyCropWat is a Python package that calculates effective precipitation using multiple methodologies from any Google Earth Engine (GEE) climate dataset. It supports:
 
