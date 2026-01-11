@@ -2,7 +2,7 @@
 
 **A Python Package for Computing Effective Precipitation Using Google Earth Engine Climate Data**
 
-[![Release](https://img.shields.io/badge/release-v1.1.0-green.svg)](https://github.com/montimaj/pyCropWat/releases)
+[![Release](https://img.shields.io/badge/release-v1.1.1-green.svg)](https://github.com/montimaj/pyCropWat/releases)
 [![PyPI](https://img.shields.io/pypi/v/pycropwat.svg)](https://pypi.org/project/pycropwat/)
 [![Downloads](https://static.pepy.tech/badge/pycropwat/month)](https://pepy.tech/project/pycropwat)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18201620.svg)](https://doi.org/10.5281/zenodo.18201620)
@@ -40,7 +40,7 @@ pyCropWat is a Python package that calculates effective precipitation using mult
 
 ## CROPWAT Formula
 
-The default effective precipitation is calculated using the CROPWAT method ([Smith, 1992](https://www.fao.org/sustainable-development-goals-helpdesk/champion/article-detail/cropwat/en); [Muratoglu et al., 2023](https://doi.org/10.1016/j.watres.2023.120011)):
+The CROPWAT method calculates effective precipitation ([Smith, 1992](https://www.fao.org/sustainable-development-goals-helpdesk/champion/article-detail/cropwat/en); [Muratoglu et al., 2023](https://doi.org/10.1016/j.watres.2023.120011)):
 
 $$
 P_{eff} = \begin{cases}
@@ -53,9 +53,9 @@ $$
 
 pyCropWat supports eight different methods for calculating effective precipitation:
 
-### 1. CROPWAT - Default
+### 1. CROPWAT
 
-The default method used in FAO CROPWAT software. This is the most widely used method for irrigation planning.
+The method used in FAO CROPWAT software. This is the most widely used method for irrigation planning.
 
 | Condition | Formula |
 |-----------|---------|
@@ -222,7 +222,7 @@ pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitatio
 
 ---
 
-### 8. Ensemble (Mean of Methods)
+### 8. Ensemble - Default (Mean of Methods)
 
 The ensemble method provides a robust estimate by calculating the mean of six methods, excluding TAGEM-SuET which has been shown to underperform in comparative analyses. This multi-method average reduces bias from any single method.
 
@@ -280,12 +280,12 @@ pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitatio
 | **Ensemble** | Robust multi-method estimate | Mean of 6 methods (excludes TAGEM-SuET) |
 
 !!! tip "Choosing a Method"
-    - Use **CROPWAT** (default) for most irrigation planning applications
+    - Use **Ensemble** (default) for robust multi-method estimates when soil and ETo data are available
+    - Use **CROPWAT** for most irrigation planning applications when soil data is unavailable
     - Use **FAO/AGLW** or **Dependable Rainfall** when following FAO Irrigation Paper No. 33 guidelines (they use the same base formula)
     - Use **Fixed Percentage** when you have locally calibrated effectiveness values
     - Use **FarmWest** for Pacific Northwest regions or when accounting for interception loss
     - Use **USDA-SCS** when soil AWC and ETo data are available for site-specific estimates
-    - Use **Ensemble** for robust multi-method estimates when soil and ETo data are available
     - Use **TAGEM-SuET** with caution - this method tends to produce the lowest Peff estimates and may underperform in arid/semi-arid regions (see [Muratoglu et al., 2023](https://doi.org/10.1016/j.watres.2023.120011))
 
 ## Quick Start

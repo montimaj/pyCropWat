@@ -143,7 +143,7 @@ peff_func = get_method_function('cropwat')
 
 precip = np.array([50, 100, 200, 300, 400])
 
-# CROPWAT method (default)
+# CROPWAT method
 peff_cropwat = cropwat_effective_precip(precip)
 # [46.  72.  136.  155.  165.]
 

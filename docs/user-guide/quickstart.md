@@ -89,19 +89,19 @@ pyCropWat supports eight methods for calculating effective precipitation:
 
 | Method | Formula | Use Case |
 |--------|---------|----------|
-| `cropwat` | P ≤ 250: Peff = P × (125 - 0.2P) / 125 <br> P > 250: Peff = 0.1P + 125 | Default FAO CROPWAT method |
+| `cropwat` | P ≤ 250: Peff = P × (125 - 0.2P) / 125 <br> P > 250: Peff = 0.1P + 125 | FAO CROPWAT method |
 | `fao_aglw` | P ≤ 250: Peff = 0.6P - 10 <br> P > 250: Peff = 0.8P - 25 | FAO Land and Water Division |
 | `fixed_percentage` | Peff = P × percentage | Simple, adjustable (default 70%) |
 | `dependable_rainfall` | Probability-scaled FAO method | Conservative estimates |
 | `farmwest` | Peff = (P - 5) × 0.75 | Pacific Northwest irrigation |
 | `usda_scs` | Uses AWC, ETo, and soil storage | Site-specific with soil data |
 | `suet` | P ≤ ETo: 0 <br> P - ETo < 75: P - ETo <br> else: 75 + f(P - ETo - 75) | TAGEM-SuET method (P - ETo with 75mm cap) |
-| `ensemble` | Mean of 6 methods (excludes TAGEM-SuET) | Robust multi-method estimate |
+| `ensemble` | Mean of 6 methods (excludes TAGEM-SuET) | Default - robust multi-method estimate |
 
 **CLI:**
 
 ```bash
-# CROPWAT (default)
+# CROPWAT
 pycropwat process --asset IDAHO_EPSCOR/TERRACLIMATE --band pr \
     --geometry roi.geojson --start-year 2020 --end-year 2023 \
     --method cropwat --output ./output

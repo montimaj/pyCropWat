@@ -184,7 +184,7 @@ print("Depend 75%:", dependable_rainfall_effective_precip(precip, 0.75))
 **CLI:**
 
 ```bash
-# CROPWAT method (default)
+# CROPWAT method
 pycropwat process --asset IDAHO_EPSCOR/TERRACLIMATE --band pr \
     --geometry roi.geojson --start-year 2015 --end-year 2020 \
     --method cropwat --output ./output_cropwat

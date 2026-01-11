@@ -57,7 +57,7 @@ pycropwat process [OPTIONS]
 | `--months`, `-m` | All | Specific months to process (1-12) |
 | `--workers`, `-w` | 4 | Number of parallel workers |
 | `--project`, `-p` | None | GEE project ID for authentication |
-| `--method` | cropwat | Effective precipitation method |
+| `--method` | ensemble | Effective precipitation method |
 | `--percentage` | 0.7 | Percentage for fixed_percentage method |
 | `--probability` | 0.75 | Probability for dependable_rainfall method |
 | `--awc-asset` | None | GEE AWC asset for usda_scs method |
@@ -72,14 +72,14 @@ pycropwat process [OPTIONS]
 
 | Method | Description |
 |--------|-------------|
-| `cropwat` | CROPWAT method from FAO (default) |
+| `cropwat` | CROPWAT method from FAO |
 | `fao_aglw` | FAO/AGLW Dependable Rainfall (80% exceedance) |
 | `fixed_percentage` | Fixed percentage of rainfall |
 | `dependable_rainfall` | Dependable rainfall approach |
 | `farmwest` | FarmWest method: Peff = (P - 5) × 0.75 |
 | `usda_scs` | USDA-SCS with AWC and ETo (requires additional assets) |
 | `suet` | TAGEM-SuET method: P - ETo with 75mm threshold (requires ETo asset) |
-| `ensemble` | Mean of 6 methods (excludes TAGEM-SuET; requires AWC and ETo) |
+| `ensemble` | Mean of 6 methods - default (excludes TAGEM-SuET; requires AWC and ETo) |
 
 ### Examples
 

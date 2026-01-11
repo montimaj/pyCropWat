@@ -197,7 +197,8 @@ Compares different effective precipitation calculation methods to help users und
 #### Methods Compared
 | Method | Formula | Description |
 |--------|---------|-------------|
-| **CROPWAT** | Peff = P×(125-0.2P)/125 (P ≤ 250mm) or 0.1P+125 (P > 250mm) | CROPWAT method (default) |
+| **Ensemble** | Mean of 6 methods | Ensemble mean (default) |
+| **CROPWAT** | Peff = P×(125-0.2P)/125 (P ≤ 250mm) or 0.1P+125 (P > 250mm) | CROPWAT method |
 | **FAO/AGLW** | Peff = 0.6×P - 10 (P ≤ 70mm) or 0.8×P - 24 (P > 70mm) | FAO Dependable Rainfall (80% exceedance) |
 | **Fixed 70%** | Peff = 0.70 × P | Simple fixed percentage method |
 | **Dependable Rain** | Peff = 0.6×P - 10 (P ≤ 70mm) or 0.8×P - 24 (P > 70mm) | Same as FAO/AGLW (80% probability) |
@@ -537,7 +538,8 @@ Compares **all 8 methods** available in pyCropWat:
 
 | Method | Description |
 |--------|-------------|
-| CROPWAT | CROPWAT formula (default) |
+| Ensemble | Mean of 6 methods (default, excludes TAGEM-SuET) |
+| CROPWAT | CROPWAT formula |
 | FAO/AGLW | FAO Dependable Rainfall (80% exceedance) |
 | Fixed 70% | Simple fixed percentage |
 | Dependable Rain | Same as FAO/AGLW (80% probability) |

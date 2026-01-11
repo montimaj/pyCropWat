@@ -1,6 +1,6 @@
 # pyCropWat
 
-[![Release](https://img.shields.io/badge/release-v1.1.0-green.svg)](https://github.com/montimaj/pyCropWat/releases)
+[![Release](https://img.shields.io/badge/release-v1.1.1-green.svg)](https://github.com/montimaj/pyCropWat/releases)
 [![PyPI](https://img.shields.io/pypi/v/pycropwat.svg)](https://pypi.org/project/pycropwat/)
 [![Downloads](https://static.pepy.tech/badge/pycropwat/month)](https://pepy.tech/project/pycropwat)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18201620.svg)](https://doi.org/10.5281/zenodo.18201620)
@@ -121,16 +121,16 @@ pyCropWat supports multiple methods for calculating effective precipitation:
 
 | Method | Description |
 |--------|-------------|
-| `cropwat` | CROPWAT method from FAO (default) |
+| `cropwat` | CROPWAT method from FAO |
 | `fao_aglw` | FAO/AGLW Dependable Rainfall (80% exceedance) |
 | `fixed_percentage` | Simple fixed percentage method (configurable, default 70%) |
 | `dependable_rainfall` | FAO Dependable Rainfall at specified probability level |
 | `farmwest` | FarmWest method: Peff = (P - 5) × 0.75 |
 | `usda_scs` | USDA-SCS method with AWC and ETo (requires GEE assets) |
 | `suet` | TAGEM-SuET method: P - ETo with 75mm threshold (requires ETo asset) |
-| `ensemble` | Ensemble mean of all methods except TAGEM-SuET (requires AWC and ETo assets) |
+| `ensemble` | Ensemble mean of all methods except TAGEM-SuET - default (requires AWC and ETo assets) |
 
-### CROPWAT Formula (Default)
+### Ensemble Formula (Default)
 
 The effective precipitation is calculated using the CROPWAT method (Smith, 1992; Muratoglu et al., 2023):
 
@@ -655,7 +655,7 @@ pycropwat plot annual-compare --input ./era5_output --other-input ./terraclimate
 | `--workers` | `-w` | No | 4 | Number of parallel workers |
 | `--months` | `-m` | No | All | Specific months to process |
 | `--project` | `-p` | No | None | GEE project ID |
-| `--method` | - | No | cropwat | Peff method: cropwat, fao_aglw, fixed_percentage, dependable_rainfall, farmwest, usda_scs, suet, ensemble |
+| `--method` | - | No | ensemble | Peff method: cropwat, fao_aglw, fixed_percentage, dependable_rainfall, farmwest, usda_scs, suet, ensemble |
 | `--percentage` | - | No | 0.7 | Percentage for fixed_percentage method |
 | `--probability` | - | No | 0.75 | Probability for dependable_rainfall method |
 | `--sequential` | - | No | False | Process sequentially |

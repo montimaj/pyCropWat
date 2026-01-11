@@ -28,14 +28,14 @@ Study Area:
 - Rio de la Plata Basin (projects/ssebop-471916/assets/Riodelaplata)
 
 Effective Precipitation Methods Compared (8 total):
-- CROPWAT - Default method from FAO CROPWAT
+- Ensemble - Mean of 6 methods (default, excludes TAGEM-SuET)
+- CROPWAT - Method from FAO CROPWAT
 - FAO/AGLW - FAO Dependable Rainfall (80% exceedance)
 - Fixed Percentage (70%) - Simple empirical method
 - Dependable Rainfall (80% probability) - Statistical approach
 - FarmWest - WSU irrigation scheduling formula
 - USDA-SCS - Site-specific method with AWC and ETo (FAO Soil + AgERA5)
 - TAGEM-SuET - Turkish Irrigation Management System (P - ETo, if P > 75mm)
-- Ensemble - Mean of 6 methods (excludes TAGEM-SuET)
 
 Output Structure:
 - ./RioDelaPlata/RDP_{Dataset}/ - USDA-SCS Peff downloads

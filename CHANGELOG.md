@@ -2,6 +2,22 @@
 
 All notable changes to pyCropWat will be documented in this file.
 
+## [1.1.1] - 2026-01-11
+
+### 🔧 Improvements
+- **Default Method Changed**: Changed default method from `cropwat` to `ensemble` for more robust multi-method estimates
+  - Ensemble requires AWC and ETo assets but provides superior results by averaging 6 methods
+  - CROPWAT remains available for users without AWC/ETo data
+
+### 🐛 Fixes
+- **AWC Band Selection Fix**: Fixed issue where `--awc-band` defaulted to `'AWC'` causing errors with single-band SSURGO
+  - Now defaults to `None` - SSURGO works without specifying band, HWSD uses `--awc-band AWC`
+
+### 📚 Documentation
+- Updated all documentation to reflect ensemble as the default method
+
+---
+
 ## [1.1.0] - 2026-01-11
 
 ### ✨ New Features
@@ -93,7 +109,8 @@ All notable changes to pyCropWat will be documented in this file.
 ### ✨ New Features
 
 #### Multiple Effective Precipitation Methods
-- **CROPWAT (default)**: CROPWAT method from FAO
+- **Ensemble (default)**: Ensemble mean of 6 methods (requires AWC and ETo)
+- **CROPWAT**: CROPWAT method from FAO
 - **FAO/AGLW**: FAO Dependable Rainfall (80% exceedance)
 - **Fixed Percentage**: Configurable percentage method (default 70%)
 - **Dependable Rainfall**: FAO method at specified probability levels (50-90%)

@@ -6,7 +6,8 @@ effective precipitation from various climate datasets available on Google Earth 
 
 The module supports multiple effective precipitation methods:
 
-- **CROPWAT**: FAO CROPWAT method (default)
+- **Ensemble**: Mean of 6 methods (default)
+- **CROPWAT**: FAO CROPWAT method
 - **FAO/AGLW**: FAO Dependable Rainfall (80% exceedance)
 - **Fixed Percentage**: Simple fixed percentage method
 - **Dependable Rainfall**: FAO Dependable Rainfall method
@@ -24,7 +25,7 @@ ep = EffectivePrecipitation(
     start_year=2015,
     end_year=2020,
     precip_scale_factor=1000,
-    method='cropwat'
+    method='ensemble'
 )
 results = ep.process(output_dir='./output', n_workers=4)
 ```
@@ -118,9 +119,10 @@ class EffectivePrecipitation:
         Takes precedence over geometry_path if both are provided.
 
     method : str, optional
-        Effective precipitation calculation method. Default is 'cropwat'.
+        Effective precipitation calculation method. Default is 'ensemble'.
         Options:
         
+        - ``'ensemble'`` - Mean of 6 methods (default, requires AWC and ETo)
         - ``'cropwat'`` - CROPWAT method (FAO standard)
         - ``'fao_aglw'`` - FAO Dependable Rainfall (80% exceedance)
         - ``'fixed_percentage'`` - Simple fixed percentage method
@@ -168,7 +170,7 @@ class EffectivePrecipitation:
         
     Examples
     --------
-    Basic usage with CROPWAT method (default):
+    Basic usage with Ensemble method (default):
     
     ```python
     from pycropwat import EffectivePrecipitation
@@ -263,7 +265,7 @@ class EffectivePrecipitation:
         precip_scale_factor: float = 1.0,
         gee_project: Optional[str] = None,
         gee_geometry_asset: Optional[str] = None,
-        method: PeffMethod = 'cropwat',
+        method: PeffMethod = 'ensemble',
         method_params: Optional[dict] = None,
     ):
         self.asset_id = asset_id
@@ -796,7 +798,7 @@ class EffectivePrecipitation:
             return self._awc_cache
         
         awc_asset = self.method_params.get('awc_asset')
-        awc_band = self.method_params.get('awc_band', 'AWC')
+        awc_band = self.method_params.get('awc_band')  # None for single-band SSURGO, 'AWC' for HWSD
         
         logger.info(f"Loading AWC data from {awc_asset}")
         

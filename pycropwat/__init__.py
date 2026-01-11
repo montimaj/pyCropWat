@@ -27,7 +27,7 @@ Quick Start
 ...     start_year=2015,
 ...     end_year=2020,
 ...     precip_scale_factor=1000,  # Convert m to mm
-...     method='cropwat'
+...     method='ensemble'
 ... )
 >>> results = ep.process(output_dir='./output', n_workers=4)
 
@@ -42,7 +42,8 @@ Supported Precipitation Datasets
 
 Effective Precipitation Methods
 -------------------------------
-- ``'cropwat'`` - CROPWAT method (FAO standard, default)
+- ``'ensemble'`` - Ensemble mean of 6 methods (default, requires AWC and ETo)
+- ``'cropwat'`` - CROPWAT method (FAO standard)
 - ``'fao_aglw'`` - FAO Dependable Rainfall (80% exceedance)
 - ``'fixed_percentage'`` - Simple fixed percentage method
 - ``'dependable_rainfall'`` - FAO Dependable Rainfall method
@@ -88,7 +89,7 @@ from .analysis import (
     export_to_cog,
 )
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 __all__ = [
     # Core
     "EffectivePrecipitation",

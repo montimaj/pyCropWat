@@ -22,14 +22,14 @@ USDA-SCS Required Data (US):
 - ETo: gridMET Monthly (projects/openet/assets/reference_et/conus/gridmet/monthly/v1)
 
 Effective Precipitation Methods Compared:
-- CROPWAT - Default method from FAO CROPWAT
+- Ensemble - Mean of 6 methods (default, excludes TAGEM-SuET)
+- CROPWAT - Method from FAO CROPWAT
 - FAO/AGLW - FAO Dependable Rainfall (80% exceedance)
 - Fixed Percentage (70%) - Simple empirical method
 - Dependable Rainfall (80% probability) - Statistical approach
 - FarmWest - WSU irrigation scheduling formula
 - USDA-SCS - Site-specific method with AWC and ETo (SSURGO + gridMET)
 - TAGEM-SuET - Turkish Irrigation Management System based on P - ETo
-- Ensemble - Mean of 6 methods (excludes TAGEM-SuET)
 
 Study Area:
 - New Mexico (NM.geojson)

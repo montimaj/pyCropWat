@@ -8,7 +8,11 @@ due to surface runoff, deep percolation, and evaporation.
 
 Available Methods
 -----------------
-* cropwat: CROPWAT method - The default method used in FAO CROPWAT software.
+* ensemble: Ensemble of all methods except TAGEM-SuET (default). Returns the mean of CROPWAT, FAO/AGLW,
+Fixed Percentage (70%), Dependable Rainfall (75%), FarmWest, and USDA-SCS methods.
+Requires AWC and ETo data.
+
+* cropwat: CROPWAT method - The method used in FAO CROPWAT software.
     
 * fao_aglw: FAO Land and Water Division formula from FAO Irrigation Paper No. 33. A two-part linear approximation.
     
@@ -26,10 +30,6 @@ evaporative demand (ETo). Requires additional GEE assets for AWC and ETo data.
 
 * suet: TAGEM-SuET (Turkish Irrigation Management and Plant Water Consumption System).
 Calculates effective precipitation based on the difference between P and ETo. Requires ETo data.
-
-* ensemble: Ensemble of all methods except TAGEM-SuET. Returns the mean of CROPWAT, FAO/AGLW,
-Fixed Percentage (70%), Dependable Rainfall (75%), FarmWest, and USDA-SCS methods.
-Requires AWC and ETo data (same as USDA-SCS).
 
 Examples
 --------
@@ -82,7 +82,7 @@ def cropwat_effective_precip(pr: np.ndarray) -> np.ndarray:
     r"""
     Calculate effective precipitation using the CROPWAT method.
     
-    This is the default method used in FAO CROPWAT software.
+    This is the method used in FAO CROPWAT software.
     
     Formula
     -------
@@ -582,12 +582,12 @@ def list_available_methods() -> dict:
         Dictionary mapping method names to descriptions.
     """
     return {
-        'cropwat': 'CROPWAT method from FAO (default)',
+        'ensemble': 'Ensemble mean of 6 methods - default (excludes SuET, requires AWC and ETo)',
+        'cropwat': 'CROPWAT method from FAO',
         'fao_aglw': 'FAO/AGLW Dependable Rainfall (80% exceedance)',
         'fixed_percentage': 'Simple fixed percentage method (default 70%)',
         'dependable_rainfall': 'FAO Dependable Rainfall at specified probability',
         'farmwest': r'FarmWest method: $P_{eff} = (P - 5) \times 0.75$',
         'usda_scs': 'USDA-SCS method with AWC and ETo (requires GEE assets)',
         'suet': 'TAGEM-SuET method based on P - ETo (requires ETo asset)',
-        'ensemble': 'Ensemble mean of 6 methods (excludes SuET, requires AWC and ETo)',
     }
