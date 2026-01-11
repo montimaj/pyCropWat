@@ -1,6 +1,4 @@
-#
-
-<p align="left">
+# <p align="left">
   <img src="assets/pyCropWat_logo.png" alt="pyCropWat Logo" width="200"><br>
   <strong>A Python Package for Computing Effective Precipitation Using Google Earth Engine Climate Data</strong>
 </p>
