@@ -42,12 +42,13 @@ Supported Precipitation Datasets
 
 Effective Precipitation Methods
 -------------------------------
-- ``'cropwat'`` - USDA SCS/CROPWAT method (FAO standard, default)
-- ``'fao_aglw'`` - FAO Land and Water Division formula
+- ``'cropwat'`` - CROPWAT method (FAO standard, default)
+- ``'fao_aglw'`` - FAO Dependable Rainfall (80% exceedance)
 - ``'fixed_percentage'`` - Simple fixed percentage method
 - ``'dependable_rainfall'`` - FAO Dependable Rainfall method
 - ``'farmwest'`` - Washington State University FarmWest method
 - ``'usda_scs'`` - USDA-SCS soil moisture depletion method
+- ``'suet'`` - TAGEM-SuET method (Turkish Irrigation Management System)
 
 Modules
 -------
@@ -87,7 +88,7 @@ from .analysis import (
     export_to_cog,
 )
 
-__version__ = "1.0.5.post1"
+__version__ = "1.1.0"
 __all__ = [
     # Core
     "EffectivePrecipitation",

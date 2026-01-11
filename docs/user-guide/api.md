@@ -143,7 +143,7 @@ peff_func = get_method_function('cropwat')
 
 precip = np.array([50, 100, 200, 300, 400])
 
-# CROPWAT (USDA SCS method - default)
+# CROPWAT method (default)
 peff_cropwat = cropwat_effective_precip(precip)
 # [46.  72.  136.  155.  165.]
 
@@ -167,6 +167,10 @@ peff_farmwest = farmwest_effective_precip(precip)
 eto = np.array([80, 120, 180, 220, 260])  # mm
 awc = np.array([0.15, 0.15, 0.15, 0.15, 0.15])  # volumetric fraction
 peff_usda = usda_scs_effective_precip(precip, eto, awc, rooting_depth=1.0)
+
+# SuET method (requires ETo array)
+from pycropwat.methods import suet_effective_precip
+peff_suet = suet_effective_precip(precip, eto)
 ```
 
 ### Using USDA-SCS Method with GEE Assets
@@ -237,12 +241,24 @@ summer = agg.seasonal_aggregate(
 )
 
 # Growing season (customizable months)
-growing = agg.growing_season_aggregate(
+# Northern Hemisphere (April-October, same year)
+growing_nh = agg.growing_season_aggregate(
     year=2020,
     start_month=4,
     end_month=10,
     method='sum',
     output_path='./growing_2020.tif'
+)
+
+# Southern Hemisphere (October-March, cross-year)
+# When start_month > end_month, automatically loads from two years
+# This aggregates Oct 2020 - Mar 2021
+growing_sh = agg.growing_season_aggregate(
+    year=2020,
+    start_month=10,
+    end_month=3,
+    method='sum',
+    output_path='./growing_2020_2021.tif'
 )
 
 # Custom month range

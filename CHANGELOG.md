@@ -2,6 +2,47 @@
 
 All notable changes to pyCropWat will be documented in this file.
 
+## [1.1.0] - 2026-01-11
+
+### ✨ New Features
+- **Ensemble Method**: Added new robust effective precipitation method that calculates the mean of 6 methods (excludes TAGEM-SuET)
+  - Formula: Peff_ensemble = (CROPWAT + FAO/AGLW + Fixed 70% + Dependable 75% + FarmWest + USDA-SCS) / 6
+  - Requires AWC and ETo data (same as USDA-SCS) via `--awc-asset` and `--eto-asset` CLI flags
+  - Recommended for robust multi-method estimates that reduce bias from any single method
+- **TAGEM-SuET Method**: Added new effective precipitation method based on P - ETo difference (Turkish Irrigation Management and Plant Water Consumption System)
+  - Formula: Peff = 0 if P ≤ ETo; Peff = P - ETo if (P - ETo) < 75; else Peff = 75 + 0.0011(P-ETo-75)² + 0.44(P-ETo-75)
+  - Requires ETo data via `--eto-asset` CLI flag or `method_params`
+  - ⚠️ Note: Studies show TAGEM-SuET tends to underperform in arid/semi-arid climates (see [Muratoglu et al., 2023](https://doi.org/10.1016/j.watres.2023.120011))
+- **Cross-Year Season Aggregation**: Added support for temporal aggregations spanning two calendar years (e.g., Southern Hemisphere growing season Oct-Mar)
+  - `custom_aggregate()` now accepts `cross_year=True` parameter for cross-year aggregations
+  - `growing_season_aggregate()` auto-detects cross-year seasons when `start_month > end_month`
+  - Example: `agg.growing_season_aggregate(2020, start_month=10, end_month=3)` aggregates Oct 2020 - Mar 2021
+- **Chunked Download for Large Regions**: Automatic chunked download for AWC and ETo data when region exceeds GEE pixel limits
+  - New generic `_download_image_chunked()` method consolidates all tiled downloads
+  - In-memory mosaicking for faster performance (no temp files)
+
+### 🔧 Improvements
+- **Code Refactoring**: Consolidated three chunked download methods into one generic `_download_image_chunked()` method
+  - Removed redundant `_download_awc_chunked()` and `_download_eto_chunked()` methods
+  - `_download_chunked()` now wraps the generic method for precipitation DataArray output
+  - Removed unused `_mosaic_tiles()` method and `tempfile`/`merge_arrays` imports
+  - ~150 lines of code reduction with cleaner architecture
+
+### 🐛 Fixes
+- **FAO/AGLW Formula Correction**: Fixed threshold from 250mm to 70mm, formula from 0.8P-25 to 0.8P-24
+- **Dependable Rainfall Formula Correction**: Fixed threshold from 100mm to 70mm, default probability from 75% to 80%
+- **Method Descriptions**: Clarified that CROPWAT and USDA-SCS are different methods (removed "USDA SCS" from CROPWAT descriptions)
+- **Large Region Downloads**: Fixed `_create_tiles` → `_create_tile_grid` method name in chunked downloads
+
+### 📚 Documentation
+- Updated all method formulas and descriptions across README, docs, and examples
+- Added TAGEM-SuET to all method comparison tables and feature lists
+- Updated CLI help text for ETo asset to mention both usda_scs and suet methods
+- Added New Mexico method comparison example with efficient single-download workflow
+- Fixed South America example to use correct Southern Hemisphere growing season (Oct-Mar)
+
+---
+
 ## [1.0.5.post1] - 2026-01-10
 
 ### 🎨 UI/Branding
@@ -52,12 +93,13 @@ All notable changes to pyCropWat will be documented in this file.
 ### ✨ New Features
 
 #### Multiple Effective Precipitation Methods
-- **CROPWAT (default)**: USDA SCS method as implemented in FAO CROPWAT
-- **FAO/AGLW**: FAO/AGLW formula from FAO Irrigation Paper No. 33
+- **CROPWAT (default)**: CROPWAT method from FAO
+- **FAO/AGLW**: FAO Dependable Rainfall (80% exceedance)
 - **Fixed Percentage**: Configurable percentage method (default 70%)
 - **Dependable Rainfall**: FAO method at specified probability levels (50-90%)
 - **FarmWest**: Washington State University's simple empirical formula: `Peff = (P - 5) × 0.75`
 - **USDA-SCS with AWC**: Site-specific method using Available Water Capacity and Reference ET from GEE assets
+- **TAGEM-SuET**: Turkish Irrigation Management System method based on P - ETo difference
 
 #### USDA-SCS Method with AWC and ETo
 - Accounts for soil water holding capacity (AWC) and evaporative demand (ETo)
@@ -131,7 +173,8 @@ All notable changes to pyCropWat will be documented in this file.
 ### 📁 Examples
 - **South America (Rio de la Plata)**: Complete workflow with ERA5-Land and TerraClimate comparison
 - **Arizona (USDA-SCS)**: U.S.-focused workflow with GridMET/PRISM precipitation, SSURGO AWC, and OpenET ETo
-- Added pre-computed example outputs for both regions
+- **New Mexico**: 8-method comparison workflow with PRISM precipitation
+- Example outputs (~32 GB) are generated locally by running the scripts
 
 ### 📦 New Dependencies
 - `scipy>=1.9.0` - Statistical functions
@@ -146,8 +189,9 @@ All notable changes to pyCropWat will be documented in this file.
 ### 📁 New Files
 - `pycropwat/methods.py` - Effective precipitation calculation methods
 - `pycropwat/analysis.py` - Temporal aggregation, statistics, visualization
-- `Examples/arizona_usda_scs_example.py` - Arizona USDA-SCS workflow
-- `Examples/south_america_cropwat_example.py` - Rio de la Plata CROPWAT workflow
+- `Examples/arizona_example.py` - Arizona workflow (all 8 methods)
+- `Examples/south_america_example.py` - Rio de la Plata workflow (all 8 methods)
+- `Examples/new_mexico_example.py` - New Mexico workflow (all 8 methods)
 
 ### 🚀 Quick Start
 

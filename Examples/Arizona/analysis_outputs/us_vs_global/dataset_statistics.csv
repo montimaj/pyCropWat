@@ -1,7 +1,0 @@
-,,mean_peff,mean_peff,mean_peff,mean_peff,median_peff
-,,mean,std,min,max,mean
-dataset,region,,,,,
-ERA5Land,Global,27.19,15.24,10.13,51.31,23.52
-GridMET,US,20.75,13.8,5.49,41.53,18.85
-PRISM,US,22.98,16.8,5.6,59.7,20.55
-TerraClimate,Global,30.82,20.66,7.22,60.64,27.25

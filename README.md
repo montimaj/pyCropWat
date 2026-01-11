@@ -1,6 +1,6 @@
 # pyCropWat
 
-[![Release](https://img.shields.io/badge/release-v1.0.5.post1-green.svg)](https://github.com/montimaj/pyCropWat/releases)
+[![Release](https://img.shields.io/badge/release-v1.1.0-green.svg)](https://github.com/montimaj/pyCropWat/releases)
 [![PyPI](https://img.shields.io/pypi/v/pycropwat.svg)](https://pypi.org/project/pycropwat/)
 [![Downloads](https://static.pepy.tech/badge/pycropwat/month)](https://pepy.tech/project/pycropwat)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18201620.svg)](https://doi.org/10.5281/zenodo.18201620)
@@ -26,7 +26,7 @@ pyCropWat/
 ├── pycropwat/               # Main package
 │   ├── __init__.py          # Package exports
 │   ├── core.py              # EffectivePrecipitation class
-│   ├── methods.py           # Effective precipitation methods (CROPWAT, FAO/AGLW, etc.)
+│   ├── methods.py           # Effective precipitation methods (8 methods)
 │   ├── analysis.py          # Temporal aggregation, statistics, visualization
 │   ├── utils.py             # Utility functions (geometry loading, GEE init)
 │   └── cli.py               # Command-line interface
@@ -40,6 +40,11 @@ pyCropWat/
 │   ├── contributing.md      # Contribution guidelines
 │   ├── assets/              # Documentation assets
 │   │   └── examples/        # Example output images for docs
+│   │       ├── arizona/     # Arizona example figures
+│   │       ├── comparisons/ # Dataset comparison figures
+│   │       ├── figures/     # Rio de la Plata figures
+│   │       ├── method_comparison/  # Method comparison figures
+│   │       └── new_mexico/  # New Mexico example figures
 │   ├── api/                 # API reference
 │   │   ├── analysis.md
 │   │   ├── cli.md
@@ -50,23 +55,13 @@ pyCropWat/
 │       ├── api.md
 │       ├── cli.md
 │       └── quickstart.md
-├── Examples/                # Example outputs and scripts
+├── Examples/                # Example scripts (data generated locally)
 │   ├── README.md               # Detailed workflow documentation
-│   ├── south_america_cropwat_example.py  # Rio de la Plata workflow script
-│   ├── arizona_usda_scs_example.py   # Arizona USDA-SCS workflow script
+│   ├── south_america_example.py  # Rio de la Plata workflow script
+│   ├── arizona_example.py      # Arizona workflow script
+│   ├── new_mexico_example.py   # New Mexico workflow script
 │   ├── AZ.geojson              # Arizona boundary GeoJSON
-│   ├── RioDelaPlata/          # Rio de la Plata region outputs
-│   │   ├── RDP_ERA5Land/         # ERA5-Land outputs
-│   │   ├── RDP_TerraClimate/     # TerraClimate outputs
-│   │   ├── analysis_inputs/      # Downloaded input data
-│   │   └── analysis_outputs/     # Analysis outputs (anomaly/climatology/trend maps)
-│   └── Arizona/               # Arizona region outputs
-│       ├── AZ_GridMET_USDA_SCS/  # GridMET U.S. dataset outputs
-│       ├── AZ_PRISM_USDA_SCS/    # PRISM U.S. dataset outputs
-│       ├── AZ_ERA5Land_USDA_SCS/ # ERA5-Land global dataset outputs
-│       ├── AZ_TerraClimate_USDA_SCS/ # TerraClimate global dataset outputs
-│       ├── analysis_inputs/      # Downloaded input data (precip, AWC, ETo)
-│       └── analysis_outputs/     # Analysis outputs (anomaly/climatology/trend maps)
+│   └── NM.geojson              # New Mexico boundary GeoJSON
 ├── .github/                 # GitHub configuration
 │   └── workflows/
 │       ├── docs.yml         # GitHub Pages deployment workflow
@@ -83,10 +78,13 @@ pyCropWat/
 
 **Note:** The `Examples/` folder contains:
 - **`README.md`**: Detailed step-by-step documentation of the complete workflow example.
-- **`south_america_cropwat_example.py`**: A comprehensive Python script demonstrating the complete pyCropWat workflow including data processing, temporal aggregation, statistical analysis, visualization (including anomaly, climatology, and trend maps), and dataset comparison using real Rio de la Plata data.
-- **`arizona_usda_scs_example.py`**: A U.S.-focused workflow demonstrating the USDA-SCS method with GridMET/PRISM precipitation and SSURGO AWC for Arizona, with U.S. vs Global dataset comparisons.
+- **`south_america_example.py`**: A comprehensive Python script demonstrating the complete pyCropWat workflow including data processing, temporal aggregation, statistical analysis, visualization (including anomaly, climatology, and trend maps), and dataset comparison using real Rio de la Plata data.
+- **`arizona_example.py`**: A U.S.-focused workflow demonstrating all 8 Peff methods with GridMET/PRISM precipitation and SSURGO AWC for Arizona, with U.S. vs Global dataset comparisons.
+- **`new_mexico_example.py`**: A New Mexico workflow comparing all 8 Peff methods using PRISM precipitation with SSURGO AWC and gridMET ETo.
 - **`AZ.geojson`**: Arizona boundary GeoJSON for local geometry support.
-- **Sample output rasters**: Monthly TerraClimate and ERA5-Land-based effective precipitation and effective precipitation fraction TIF files (2000-2025) for the Rio de la Plata (RDP) region of South America.
+- **`NM.geojson`**: New Mexico boundary GeoJSON for local geometry support.
+
+**Note:** Output rasters (~32 GB) are not included in the repository. Run the example scripts with a GEE project ID to generate them locally.
 
 See the [Complete Workflow Examples](#complete-workflow-examples) section below for details.
 
@@ -102,10 +100,10 @@ pyCropWat converts precipitation data from any GEE climate dataset into effectiv
 
 - Any GEE ImageCollection with precipitation data from the [GEE Data Catalog](https://developers.google.com/earth-engine/datasets) or [Community Catalog](https://gee-community-catalog.org/)
 - Shapefile, GeoJSON, or GEE FeatureCollection asset for region of interest
-- **Multiple effective precipitation methods**: CROPWAT, FAO/AGLW, Fixed Percentage, Dependable Rainfall, FarmWest, USDA-SCS
+- **Multiple effective precipitation methods**: CROPWAT, FAO/AGLW, Fixed Percentage, Dependable Rainfall, FarmWest, USDA-SCS, TAGEM-SuET, Ensemble
 - Parallel processing using Dask
 - Monthly output rasters in GeoTIFF format
-- **Temporal aggregation**: Seasonal, annual, growing season, custom date ranges
+- **Temporal aggregation**: Seasonal, annual, growing season (with cross-year support for Southern Hemisphere), custom date ranges
 - **Statistical analysis**: Climatology, anomalies, trend analysis
 - **Enhanced exports**: NetCDF, Cloud-Optimized GeoTIFF (COG), zonal statistics CSV
 - **Visualization**: Time series plots, maps, climatology charts, anomaly maps, trend maps with significance
@@ -123,26 +121,28 @@ pyCropWat supports multiple methods for calculating effective precipitation:
 
 | Method | Description |
 |--------|-------------|
-| `cropwat` | USDA SCS method as implemented in FAO CROPWAT (default) |
-| `fao_aglw` | FAO/AGLW formula from FAO Irrigation Paper No. 33 |
+| `cropwat` | CROPWAT method from FAO (default) |
+| `fao_aglw` | FAO/AGLW Dependable Rainfall (80% exceedance) |
 | `fixed_percentage` | Simple fixed percentage method (configurable, default 70%) |
 | `dependable_rainfall` | FAO Dependable Rainfall at specified probability level |
 | `farmwest` | FarmWest method: Peff = (P - 5) × 0.75 |
 | `usda_scs` | USDA-SCS method with AWC and ETo (requires GEE assets) |
+| `suet` | TAGEM-SuET method: P - ETo with 75mm threshold (requires ETo asset) |
+| `ensemble` | Ensemble mean of all methods except TAGEM-SuET (requires AWC and ETo assets) |
 
 ### CROPWAT Formula (Default)
 
-The effective precipitation is calculated using the USDA SCS method as implemented in FAO CROPWAT (Smith, 1992; Muratoglu et al., 2023):
+The effective precipitation is calculated using the CROPWAT method (Smith, 1992; Muratoglu et al., 2023):
 
 - If precipitation ≤ 250 mm: `Peff = P × (125 - 0.2 × P) / 125`
 - If precipitation > 250 mm: `Peff = 0.1 × P + 125`
 
-### FAO/AGLW Formula
+### FAO/AGLW Formula (Dependable Rainfall)
 
-The FAO Land and Water Division (AGLW) formula from FAO Irrigation and Drainage Paper No. 33:
+The FAO Land and Water Division (AGLW) Dependable Rainfall formula from FAO Irrigation and Drainage Paper No. 33, based on 80% probability exceedance:
 
-- If precipitation ≤ 250 mm: `Peff = max(0.6 × P - 10, 0)`
-- If precipitation > 250 mm: `Peff = 0.8 × P - 25`
+- If precipitation ≤ 70 mm: `Peff = max(0.6 × P - 10, 0)`
+- If precipitation > 70 mm: `Peff = 0.8 × P - 24`
 
 ### Fixed Percentage Method
 
@@ -152,15 +152,15 @@ A simple method assuming a constant fraction of precipitation is effective:
 
 ### Dependable Rainfall Method
 
-The FAO Dependable Rainfall method estimates rainfall at a given probability level (default 75%):
+The FAO Dependable Rainfall method (same as FAO/AGLW) estimates rainfall at a given probability level (default 80%):
 
-- If precipitation < 100 mm: `Peff = max(0.6 × P - 10, 0)`
-- If precipitation ≥ 100 mm: `Peff = 0.8 × P - 25`
+- If precipitation ≤ 70 mm: `Peff = max(0.6 × P - 10, 0)`
+- If precipitation > 70 mm: `Peff = 0.8 × P - 24`
 
 A probability scaling factor is applied:
-- 50% probability: ~1.2× base estimate (less conservative)
-- 75% probability: 1.0× base estimate (default)
-- 90% probability: ~0.8× base estimate (more conservative)
+- 50% probability: ~1.3× base estimate (less conservative)
+- 80% probability: 1.0× base estimate (default)
+- 90% probability: ~0.9× base estimate (more conservative)
 
 ### FarmWest Method
 
@@ -213,16 +213,66 @@ pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitatio
 
 **Reference:** [USDA SCS (1993). Chapter 2 Irrigation Water Requirements. Part 623 National Engineering Handbook.](https://www.wcc.nrcs.usda.gov/ftpref/wntsc/waterMgt/irrigation/NEH15/ch2.pdf)
 
+### TAGEM-SuET Method (with ETo)
+
+The TAGEM-SuET (Türkiye'de Sulanan Bitkilerin Bitki Su Tüketimleri - Turkish Irrigation Management and Plant Water Consumption System) method calculates effective precipitation based on the difference between precipitation and reference evapotranspiration:
+
+- If P ≤ ETo: `Peff = 0`
+- If P > ETo and (P - ETo) < 75: `Peff = P - ETo`
+- Otherwise: `Peff = 75 + 0.0011×(P - ETo - 75)² + 0.44×(P - ETo - 75)`
+
+> ⚠️ **Note:** Studies have shown that the TAGEM-SuET method tends to underperform compared to other methods, particularly in arid and semi-arid climates where ETo often exceeds precipitation. In our method comparison analyses, TAGEM-SuET consistently produced the lowest effective precipitation estimates. Users should consider this limitation when selecting a method for their application.
+
+**Reference:** [Muratoglu, A., Bilgen, G. K., Angin, I., & Kodal, S. (2023). Performance analyses of effective rainfall estimation methods for accurate quantification of agricultural water footprint. Water Research, 238, 120011.](https://doi.org/10.1016/j.watres.2023.120011)
+
+**CLI Example:**
+```bash
+pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitation_sum \
+    --gee-geometry projects/my-project/assets/study_area \
+    --start-year 2015 --end-year 2020 --scale-factor 1000 \
+    --method suet \
+    --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \
+    --eto-band eto --output ./output
+```
+
+### Ensemble Method (Mean of Methods)
+
+The ensemble method provides a robust estimate by calculating the mean of all methods except TAGEM-SuET, which has been shown to underperform in comparative analyses. The ensemble includes:
+
+1. **CROPWAT** - FAO standard method
+2. **FAO/AGLW** - Dependable Rainfall (80% exceedance)
+3. **Fixed Percentage** - 70% of precipitation
+4. **Dependable Rainfall** - 75% probability level
+5. **FarmWest** - Pacific Northwest method
+6. **USDA-SCS** - Soil-based method
+
+Formula: `Peff_ensemble = (Peff_cropwat + Peff_fao_aglw + Peff_fixed + Peff_dependable + Peff_farmwest + Peff_usda_scs) / 6`
+
+> 💡 **Note:** The ensemble method requires AWC and ETo assets (same as USDA-SCS) since it internally calculates all component methods. This method is recommended when users want a robust, multi-method average that reduces bias from any single method.
+
+**CLI Example:**
+```bash
+pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitation_sum \
+    --gee-geometry projects/my-project/assets/study_area \
+    --start-year 2015 --end-year 2020 --scale-factor 1000 \
+    --method ensemble \
+    --awc-asset projects/sat-io/open-datasets/FAO/HWSD_V2_SMU --awc-band AWC \
+    --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \
+    --eto-band eto --output ./output
+```
+
 ### Method Comparison
 
 | Method | Use Case | Characteristics |
 |--------|----------|-----------------|
 | **CROPWAT** | General irrigation planning | Balanced, widely validated |
-| **FAO/AGLW** | Yield response studies | Similar to CROPWAT, slightly different curve |
+| **FAO/AGLW** | Yield response studies | FAO Dependable Rainfall (80% exceedance) |
 | **Fixed Percentage** | Quick estimates, calibration | Simple, requires local calibration |
-| **Dependable Rainfall** | Risk-averse planning | Conservative, probability-based |
+| **Dependable Rainfall** | Risk-averse planning | Same as FAO/AGLW, with probability scaling |
 | **FarmWest** | Pacific Northwest irrigation | Simple, accounts for interception loss |
 | **USDA-SCS** | Site-specific irrigation planning | Accounts for soil AWC and ETo |
+| **TAGEM-SuET** | ET-based irrigation planning | Based on P - ETo difference |
+| **Ensemble** | Robust multi-method estimate | Mean of 6 methods (excludes TAGEM-SuET) |
 
 ## Installation
 
@@ -238,17 +288,22 @@ Or with optional interactive map support:
 pip install pycropwat[interactive]
 ```
 
-### Disk Space Requirements (Source Install)
+### Disk Space Requirements
 
 | Component | Size | Notes |
 |-----------|------|-------|
-| Repository (code + docs) | ~16 MB | Core package, documentation, and assets |
-| Examples (sample outputs) | ~4 GB | Pre-computed TIF files for Rio de la Plata and Arizona |
-| **Total (full clone)** | **~6 GB** | Includes all example data |
+| Repository (code + docs) | ~50 MB | Core package, documentation, and assets |
+| **Generated by example scripts:** | | |
+| Examples/RioDelaPlata | ~5 GB | ERA5-Land & TerraClimate outputs (2000-2025) |
+| Examples/Arizona | ~12 GB | GridMET, PRISM, ERA5-Land & TerraClimate outputs (1985-2025) |
+| Examples/NewMexico | ~14 GB | PRISM 8-method outputs (1986-2025) |
 
-**Tip:** To clone without example data, use a shallow clone and exclude large files:
+**Note:** Large data files (~32 GB) are excluded from the repository via `.gitignore`. 
+Run the example scripts to generate them locally:
 ```bash
-git clone --depth 1 https://github.com/montimaj/pyCropWat.git
+python Examples/south_america_example.py --gee-project your-project-id
+python Examples/arizona_example.py --gee-project your-project-id
+python Examples/new_mexico_example.py --gee-project your-project-id
 ```
 
 ### Using Conda (Recommended for Development)
@@ -365,7 +420,7 @@ ep = EffectivePrecipitation(
     start_year=2015,
     end_year=2020,
     precip_scale_factor=1000,
-    method='fao_aglw'  # Options: 'cropwat', 'fao_aglw', 'fixed_percentage', 'dependable_rainfall', 'farmwest', 'usda_scs'
+    method='fao_aglw'  # Options: 'cropwat', 'fao_aglw', 'fixed_percentage', 'dependable_rainfall', 'farmwest', 'usda_scs', 'suet', 'ensemble'
 )
 
 # Process with parallel execution (using dask)
@@ -393,8 +448,12 @@ annual = agg.annual_aggregate(2020, method='sum', output_path='./annual_2020.tif
 # Seasonal aggregate (JJA = June-July-August)
 summer = agg.seasonal_aggregate(2020, 'JJA', method='sum')
 
-# Growing season (April-October)
-growing = agg.growing_season_aggregate(2020, start_month=4, end_month=10)
+# Growing season - Northern Hemisphere (April-October, same year)
+growing_nh = agg.growing_season_aggregate(2020, start_month=4, end_month=10)
+
+# Growing season - Southern Hemisphere (October-March, cross-year)
+# Aggregates Oct 2020 - Mar 2021 when start_month > end_month
+growing_sh = agg.growing_season_aggregate(2020, start_month=10, end_month=3)
 
 # Multi-year climatology
 climatology = agg.multi_year_climatology(2000, 2020, output_dir='./climatology')
@@ -596,7 +655,7 @@ pycropwat plot annual-compare --input ./era5_output --other-input ./terraclimate
 | `--workers` | `-w` | No | 4 | Number of parallel workers |
 | `--months` | `-m` | No | All | Specific months to process |
 | `--project` | `-p` | No | None | GEE project ID |
-| `--method` | - | No | cropwat | Peff method: cropwat, fao_aglw, fixed_percentage, dependable_rainfall, farmwest, usda_scs |
+| `--method` | - | No | cropwat | Peff method: cropwat, fao_aglw, fixed_percentage, dependable_rainfall, farmwest, usda_scs, suet, ensemble |
 | `--percentage` | - | No | 0.7 | Percentage for fixed_percentage method |
 | `--probability` | - | No | 0.75 | Probability for dependable_rainfall method |
 | `--sequential` | - | No | False | Process sequentially |
@@ -623,12 +682,14 @@ The package generates two GeoTIFF files per month:
 
 ### Large Region Handling
 
-For large study areas or high-resolution outputs that exceed GEE's pixel limits, pyCropWat automatically:
-1. Splits the region into smaller tiles (max 256×256 pixels per tile)
-2. Downloads each tile separately
-3. Mosaics the tiles back together using `rioxarray`
+For large study areas or high-resolution outputs that exceed GEE's pixel limits (262,144 pixels per request), pyCropWat automatically:
+1. Estimates pixel count for the region
+2. Splits large regions into smaller tiles (max 256×256 pixels per tile)
+3. Downloads each tile separately from GEE
+4. Mosaics the tiles back together in memory (no temp files)
+5. Resizes to match the target resolution
 
-This is handled automatically with no additional dependencies required.
+This applies to precipitation, AWC, and ETo data downloads. No configuration required - it's handled automatically.
 
 ### Important: Units
 
@@ -688,7 +749,7 @@ The `Examples/` directory contains comprehensive workflow scripts demonstrating 
 
 ### 1. Rio de la Plata Basin Example (Global)
 
-📖 **Script:** `Examples/south_america_cropwat_example.py`
+📖 **Script:** `Examples/south_america_example.py`
 
 Demonstrates the complete pyCropWat workflow comparing ERA5-Land and TerraClimate data for South America.
 
@@ -712,13 +773,13 @@ The script performs a comprehensive 6-step workflow:
 cd Examples/
 
 # Run analysis only (using existing pre-processed data)
-python south_america_cropwat_example.py --analysis-only
+python south_america_example.py --analysis-only
 
 # Run full workflow with GEE processing (requires authentication)
-python south_america_cropwat_example.py --gee-project your-project-id --workers 8
+python south_america_example.py --gee-project your-project-id --workers 8
 
 # Force reprocess all data from GEE
-python south_america_cropwat_example.py --force-reprocess --gee-project your-project-id --workers 8
+python south_america_example.py --force-reprocess --gee-project your-project-id --workers 8
 ```
 
 #### Configuration
@@ -735,7 +796,7 @@ python south_america_cropwat_example.py --force-reprocess --gee-project your-pro
 
 ### 2. Arizona USDA-SCS Example (U.S.)
 
-📖 **Script:** `Examples/arizona_usda_scs_example.py`
+📖 **Script:** `Examples/arizona_example.py`
 
 Demonstrates the **USDA-SCS method** with U.S.-specific AWC and ETo datasets for Arizona, comparing GridMET and PRISM precipitation data.
 
@@ -764,13 +825,13 @@ The Arizona example uses these U.S.-based GEE datasets:
 cd Examples/
 
 # Run analysis only (if data already processed)
-python arizona_usda_scs_example.py --analysis-only
+python arizona_example.py --analysis-only
 
 # Run full workflow with GEE processing
-python arizona_usda_scs_example.py --gee-project your-project-id --workers 8
+python arizona_example.py --gee-project your-project-id --workers 8
 
 # Force reprocess
-python arizona_usda_scs_example.py --force-reprocess --gee-project your-project-id
+python arizona_example.py --force-reprocess --gee-project your-project-id
 ```
 
 #### CLI Equivalent
@@ -818,9 +879,11 @@ Running the example creates organized outputs:
 
 ```
 Examples/
-├── south_america_cropwat_example.py   # Rio de la Plata workflow script
-├── arizona_usda_scs_example.py        # Arizona USDA-SCS workflow script
+├── south_america_example.py   # Rio de la Plata workflow script
+├── arizona_example.py         # Arizona workflow script
+├── new_mexico_example.py      # New Mexico workflow script
 ├── AZ.geojson                         # Arizona boundary GeoJSON
+├── NM.geojson                         # New Mexico boundary GeoJSON
 ├── README.md                          # Detailed documentation
 ├── RioDelaPlata/                      # Rio de la Plata region
 │   ├── RDP_ERA5Land/                     # Monthly effective precipitation (ERA5-Land)
@@ -966,7 +1029,7 @@ The following visualizations are generated by the complete workflow example usin
   <img src="https://raw.githubusercontent.com/montimaj/pyCropWat/main/docs/assets/examples/method_comparison/ERA5Land_method_maps_2020_01.png" width="100%" alt="Method Comparison Maps">
 </p>
 
-*Comparison of effective precipitation methods: CROPWAT, FAO/AGLW, Fixed Percentage (70%), Dependable Rainfall (75%), FarmWest, and USDA-SCS.*
+*Comparison of all 8 effective precipitation methods: CROPWAT, FAO/AGLW, Fixed Percentage (70%), Dependable Rainfall (80%), FarmWest, USDA-SCS, TAGEM-SuET, and Ensemble.*
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/montimaj/pyCropWat/main/docs/assets/examples/method_comparison/ERA5Land_method_curves.png" width="60%" alt="Method Curves">
@@ -978,7 +1041,7 @@ The following visualizations are generated by the complete workflow example usin
 
 ### Arizona USDA-SCS Example Outputs
 
-The Arizona workflow ([Examples/arizona_usda_scs_example.py](https://github.com/montimaj/pyCropWat/blob/main/Examples/arizona_usda_scs_example.py)) demonstrates U.S.-specific datasets with the USDA-SCS method:
+The Arizona workflow ([Examples/arizona_example.py](https://github.com/montimaj/pyCropWat/blob/main/Examples/arizona_example.py)) demonstrates U.S.-specific datasets with the USDA-SCS method:
 
 #### Time Series & Climatology
 
@@ -1012,6 +1075,28 @@ The Arizona workflow ([Examples/arizona_usda_scs_example.py](https://github.com/
 </p>
 
 *Comparison of U.S. datasets (GridMET, PRISM) vs Global datasets (ERA5-Land, TerraClimate) for Arizona.*
+
+---
+
+### New Mexico 8-Method Comparison Example Outputs
+
+The New Mexico workflow ([Examples/new_mexico_example.py](https://github.com/montimaj/pyCropWat/blob/main/Examples/new_mexico_example.py)) compares all 8 effective precipitation methods using PRISM data:
+
+#### Mean Annual Comparison (1986-2025)
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/montimaj/pyCropWat/main/docs/assets/examples/new_mexico/method_comparison/mean_annual_comparison_1986_2025.png" width="100%" alt="New Mexico Mean Annual Comparison">
+</p>
+
+*Mean annual effective precipitation (1986-2025) for all 8 methods: CROPWAT, FAO/AGLW, Fixed 70%, Dependable Rainfall, FarmWest, USDA-SCS, TAGEM-SuET, and Ensemble.*
+
+#### Method Curves
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/montimaj/pyCropWat/main/docs/assets/examples/new_mexico/method_comparison/method_curves_new_mexico.png" width="60%" alt="New Mexico Method Curves">
+</p>
+
+*Theoretical response curves for all 8 effective precipitation methods using New Mexico typical values (AWC=120mm/m, ETo=200mm/month).*
 
 For more examples and detailed API usage, see the [Examples documentation](https://montimaj.github.io/pyCropWat/examples/).
 

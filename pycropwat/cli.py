@@ -76,6 +76,14 @@ def cmd_process(args):
                         "Global: projects/climate-engine-pro/assets/ce-ag-era5-v2/daily (set --eto-is-daily)")
             sys.exit(1)
     
+    # Validate SuET method requirements
+    if args.method == 'suet':
+        if not args.eto_asset:
+            logger.error("SuET method requires --eto-asset. "
+                        "U.S.: projects/openet/assets/reference_et/conus/gridmet/monthly/v1, "
+                        "Global: projects/climate-engine-pro/assets/ce-ag-era5-v2/daily (set --eto-is-daily)")
+            sys.exit(1)
+    
     try:
         logger.info(f"Initializing effective precipitation processor...")
         logger.info(f"Asset: {args.asset}")
@@ -467,7 +475,7 @@ def create_parser():
     parser.add_argument(
         '--version',
         action='version',
-        version='%(prog)s 1.0.5.post1'
+        version='%(prog)s 1.1.0'
     )
     
     parser.add_argument(
@@ -512,17 +520,17 @@ Examples:
     process_parser.add_argument('--months', '-m', type=int, nargs='+', help='Specific months to process (1-12)')
     process_parser.add_argument('--project', '-p', type=str, help='GEE project ID')
     process_parser.add_argument('--method', type=str, default='cropwat',
-                               choices=['cropwat', 'fao_aglw', 'fixed_percentage', 'dependable_rainfall', 'farmwest', 'usda_scs'],
+                               choices=['cropwat', 'fao_aglw', 'fixed_percentage', 'dependable_rainfall', 'farmwest', 'usda_scs', 'suet', 'ensemble'],
                                help='Effective precipitation method')
     process_parser.add_argument('--percentage', type=float, default=0.7, help='Percentage for fixed_percentage method')
     process_parser.add_argument('--probability', type=float, default=0.75, help='Probability for dependable_rainfall method')
     # USDA-SCS method parameters
     process_parser.add_argument('--awc-asset', type=str, 
-                               help='GEE AWC asset for usda_scs method. U.S.: projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite, Global: projects/sat-io/open-datasets/FAO/HWSD_V2_SMU')
+                               help='GEE AWC asset for usda_scs/ensemble method. U.S.: projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite, Global: projects/sat-io/open-datasets/FAO/HWSD_V2_SMU')
     process_parser.add_argument('--awc-band', type=str, default='AWC',
                                help='AWC band name. SSURGO is single-band, HWSD uses "AWC"')
     process_parser.add_argument('--eto-asset', type=str,
-                               help='GEE ETo asset for usda_scs method. U.S.: projects/openet/assets/reference_et/conus/gridmet/monthly/v1, Global: projects/climate-engine-pro/assets/ce-ag-era5-v2/daily')
+                               help='GEE ETo asset for usda_scs/suet methods. U.S.: projects/openet/assets/reference_et/conus/gridmet/monthly/v1, Global: projects/climate-engine-pro/assets/ce-ag-era5-v2/daily')
     process_parser.add_argument('--eto-band', type=str, default='eto',
                                help='ETo band name. GridMET: "eto", ERA5: "ReferenceET_PenmanMonteith_FAO56"')
     process_parser.add_argument('--eto-is-daily', action='store_true',

@@ -8,8 +8,7 @@ due to surface runoff, deep percolation, and evaporation.
 
 Available Methods
 -----------------
-* cropwat: USDA SCS/CROPWAT method - The default method used in FAO CROPWAT software. 
-Based on the USDA Soil Conservation Service formula.
+* cropwat: CROPWAT method - The default method used in FAO CROPWAT software.
     
 * fao_aglw: FAO Land and Water Division formula from FAO Irrigation Paper No. 33. A two-part linear approximation.
     
@@ -24,6 +23,13 @@ Simple empirical formula assuming 5mm interception loss and 75% effectiveness.
     
 * usda_scs: USDA-SCS soil moisture depletion method. Accounts for soil water holding capacity (AWC) and 
 evaporative demand (ETo). Requires additional GEE assets for AWC and ETo data.
+
+* suet: TAGEM-SuET (Turkish Irrigation Management and Plant Water Consumption System).
+Calculates effective precipitation based on the difference between P and ETo. Requires ETo data.
+
+* ensemble: Ensemble of all methods except TAGEM-SuET. Returns the mean of CROPWAT, FAO/AGLW,
+Fixed Percentage (70%), Dependable Rainfall (75%), FarmWest, and USDA-SCS methods.
+Requires AWC and ETo data (same as USDA-SCS).
 
 Examples
 --------
@@ -66,13 +72,15 @@ PeffMethod = Literal[
     "fixed_percentage",
     "dependable_rainfall",
     "farmwest",
-    "usda_scs"
+    "usda_scs",
+    "suet",
+    "ensemble"
 ]
 
 
 def cropwat_effective_precip(pr: np.ndarray) -> np.ndarray:
     r"""
-    Calculate effective precipitation using the USDA SCS/CROPWAT method.
+    Calculate effective precipitation using the CROPWAT method.
     
     This is the default method used in FAO CROPWAT software.
     
@@ -114,16 +122,18 @@ def cropwat_effective_precip(pr: np.ndarray) -> np.ndarray:
 
 def fao_aglw_effective_precip(pr: np.ndarray) -> np.ndarray:
     r"""
-    Calculate effective precipitation using the FAO/AGLW formula.
+    Calculate effective precipitation using the FAO/AGLW Dependable Rainfall formula.
     
-    This method is used by FAO's Land and Water Division (AGLW).
+    This method is the FAO Dependable Rainfall method based on 80% probability
+    exceedance, used by FAO's Land and Water Division (AGLW). Also known as
+    the dependable rainfall method.
     
     Formula
     -------
     $$
     P_{eff} = \begin{cases}
-    \max(0.6P - 10, 0) & \text{if } P \leq 250 \text{ mm} \\
-    0.8P - 25 & \text{if } P > 250 \text{ mm}
+    \max(0.6P - 10, 0) & \text{if } P \leq 70 \text{ mm} \\
+    0.8P - 24 & \text{if } P > 70 \text{ mm}
     \end{cases}
     $$
     
@@ -144,9 +154,9 @@ def fao_aglw_effective_precip(pr: np.ndarray) -> np.ndarray:
     Paper No. 33.
     """
     ep = np.where(
-        pr <= 250,
+        pr <= 70,
         np.maximum(0.6 * pr - 10, 0),
-        0.8 * pr - 25
+        0.8 * pr - 24
     )
     return ep.astype(np.float32)
 
@@ -191,21 +201,21 @@ def fixed_percentage_effective_precip(
 
 def dependable_rainfall_effective_precip(
     pr: np.ndarray,
-    probability: float = 0.75
+    probability: float = 0.80
 ) -> np.ndarray:
     r"""
     Calculate effective precipitation using the FAO Dependable Rainfall method.
     
-    This method estimates the amount of rainfall that can be depended upon
-    at a given probability level. Based on the FAO method which considers
-    that effective rainfall at 75% probability is approximately:
+    This is the same as the FAO/AGLW method, based on 80% probability
+    exceedance. The formula estimates the amount of rainfall that can be
+    depended upon at a given probability level.
     
-    Formula (approximation for 75% probability)
-    -------------------------------------------
+    Formula (80% probability exceedance - default)
+    -----------------------------------------------
     $$
     P_{eff} = \begin{cases}
-    \max(0.6P - 10, 0) & \text{if } P < 100 \text{ mm} \\
-    0.8P - 25 & \text{if } P \geq 100 \text{ mm}
+    \max(0.6P - 10, 0) & \text{if } P \leq 70 \text{ mm} \\
+    0.8P - 24 & \text{if } P > 70 \text{ mm}
     \end{cases}
     $$
     
@@ -218,7 +228,7 @@ def dependable_rainfall_effective_precip(
         Monthly precipitation in mm.
     
     probability : float, optional
-        Probability level (0.5-0.9). Default is 0.75 (75%).
+        Probability level (0.5-0.9). Default is 0.80 (80%).
         Higher probability = more conservative estimate.
         
     Returns
@@ -228,8 +238,8 @@ def dependable_rainfall_effective_precip(
         
     References
     ----------
-    FAO. (1992). CROPWAT - A computer program for irrigation planning
-    and management. FAO Irrigation and Drainage Paper No. 46.
+    FAO. (1986). Yield response to water. FAO Irrigation and Drainage
+    Paper No. 33.
     
     Notes
     -----
@@ -240,18 +250,18 @@ def dependable_rainfall_effective_precip(
     if not 0.5 <= probability <= 0.9:
         raise ValueError(f"Probability must be between 0.5 and 0.9, got {probability}")
     
-    # Base calculation at 75% probability
+    # Base calculation at 80% probability exceedance
     ep_base = np.where(
-        pr < 100,
+        pr <= 70,
         np.maximum(0.6 * pr - 10, 0),
-        0.8 * pr - 25
+        0.8 * pr - 24
     )
     
     # Apply probability scaling
-    # At 50% probability, multiply by ~1.2
-    # At 75% probability, multiply by 1.0 (base case)
+    # At 50% probability, multiply by ~1.3
+    # At 80% probability, multiply by 1.0 (base case)
     # At 90% probability, multiply by ~0.8
-    prob_scale = 1.0 + (0.75 - probability) * 0.8
+    prob_scale = 1.0 + (0.80 - probability) * 1.0
     
     ep = ep_base * prob_scale
     return np.maximum(ep, 0).astype(np.float32)
@@ -324,8 +334,8 @@ def usda_scs_effective_precip(
         Reference evapotranspiration in mm.
     
     awc : np.ndarray
-        Available Water Capacity in inches/inch (volumetric fraction).
-        For gNATSGO data and FAO data, this is typically in units of mm/m.
+        Available Water Capacity. For SSURGO data (U.S.), this is in inches
+        (total for 0-152cm profile). For FAO HWSD data (global), this is in mm/m.
     
     rooting_depth : float, optional
         Crop rooting depth in meters. Default is 1.0 m.
@@ -384,6 +394,144 @@ def usda_scs_effective_precip(
     return ep.astype(np.float32)
 
 
+def suet_effective_precip(
+    pr: np.ndarray,
+    eto: np.ndarray
+) -> np.ndarray:
+    r"""
+    Calculate effective precipitation using the TAGEM-SuET method.
+    
+    TAGEM-SuET (Türkiye'de Sulanan Bitkilerin Bitki Su Tüketimleri) is the
+    Turkish Irrigation Management and Plant Water Consumption System.
+    This method calculates effective precipitation based on the difference
+    between precipitation and reference evapotranspiration. When precipitation
+    exceeds ETo, the excess becomes effective precipitation, with a non-linear
+    reduction for large excesses.
+    
+    Formula
+    -------
+    $$
+    P_{eff} = \begin{cases}
+    0 & \text{if } P \leq ET_o \\
+    P - ET_o & \text{if } P > ET_o \text{ and } (P - ET_o) < 75 \\
+    75 + 0.0011(P - ET_o - 75)^2 + 0.44(P - ET_o - 75) & \text{otherwise}
+    \end{cases}
+    $$
+    
+    Parameters
+    ----------
+    
+    pr : np.ndarray
+        Total precipitation in mm.
+    
+    eto : np.ndarray
+        Reference evapotranspiration in mm.
+        
+    Returns
+    -------
+    np.ndarray
+        Effective precipitation in mm.
+    """
+    # Calculate P - ETo
+    p_minus_eto = pr - eto
+    
+    # Case 1: P <= ETo -> Peff = 0
+    # Case 2: P > ETo and (P - ETo) < 75 -> Peff = P - ETo
+    # Case 3: P > ETo and (P - ETo) >= 75 -> Peff = 75 + 0.0011*(P-ETo-75)^2 + 0.44*(P-ETo-75)
+    
+    excess = p_minus_eto - 75  # (P - ETo - 75) term
+    
+    ep = np.where(
+        pr <= eto,
+        0,
+        np.where(
+            p_minus_eto < 75,
+            p_minus_eto,
+            75 + 0.0011 * np.power(excess, 2) + 0.44 * excess
+        )
+    )
+    
+    return np.maximum(ep, 0).astype(np.float32)
+
+
+def ensemble_effective_precip(
+    pr: np.ndarray,
+    eto: np.ndarray,
+    awc: np.ndarray,
+    rooting_depth: float = 1.0,
+    fixed_percentage: float = 0.7,
+    dependable_probability: float = 0.75
+) -> np.ndarray:
+    r"""
+    Calculate effective precipitation using ensemble of all methods except TAGEM-SuET.
+    
+    This method computes the mean of 6 effective precipitation methods:
+    CROPWAT, FAO/AGLW, Fixed Percentage, Dependable Rainfall, FarmWest, and USDA-SCS.
+    The TAGEM-SuET method is excluded as it tends to underperform in arid/semi-arid
+    climates (Muratoglu et al., 2023).
+    
+    Formula
+    -------
+    $$P_{eff}^{ensemble} = \frac{1}{6} \sum_{i=1}^{6} P_{eff}^{(i)}$$
+    
+    where the six methods are: CROPWAT, FAO/AGLW, Fixed %, Dependable Rain, FarmWest, USDA-SCS.
+    
+    Parameters
+    ----------
+    
+    pr : np.ndarray
+        Total precipitation in mm.
+    
+    eto : np.ndarray
+        Reference evapotranspiration in mm.
+    
+    awc : np.ndarray
+        Available Water Capacity in inches/inch (volumetric fraction).
+        SSURGO asset provides this directly.
+    
+    rooting_depth : float, optional
+        Crop rooting depth in meters. Default is 1.0 m.
+        
+    fixed_percentage : float, optional
+        Fraction for Fixed Percentage method (0-1). Default is 0.7.
+        
+    dependable_probability : float, optional
+        Probability for Dependable Rainfall method (0.5-0.9). Default is 0.75.
+        
+    Returns
+    -------
+    np.ndarray
+        Ensemble mean effective precipitation in mm.
+        
+    References
+    ----------
+    Muratoglu, A., Bilgen, G. K., Angin, I., & Kodal, S. (2023). Performance
+    analyses of effective rainfall estimation methods for accurate quantification
+    of agricultural water footprint. Water Research, 238, 120011.
+    """
+    # Calculate Peff using each method
+    peff_cropwat = cropwat_effective_precip(pr)
+    peff_fao = fao_aglw_effective_precip(pr)
+    peff_fixed = fixed_percentage_effective_precip(pr, fixed_percentage)
+    peff_dependable = dependable_rainfall_effective_precip(pr, dependable_probability)
+    peff_farmwest = farmwest_effective_precip(pr)
+    peff_usda = usda_scs_effective_precip(pr, eto, awc, rooting_depth)
+    
+    # Stack and compute mean
+    peff_stack = np.stack([
+        peff_cropwat,
+        peff_fao,
+        peff_fixed,
+        peff_dependable,
+        peff_farmwest,
+        peff_usda
+    ], axis=0)
+    
+    ep = np.nanmean(peff_stack, axis=0)
+    
+    return ep.astype(np.float32)
+
+
 def get_method_function(method: PeffMethod):
     """
     Get the effective precipitation function for a given method name.
@@ -393,7 +541,7 @@ def get_method_function(method: PeffMethod):
     
     method : str
         Method name: 'cropwat', 'fao_aglw', 'fixed_percentage', 
-        'dependable_rainfall', 'farmwest', or 'usda_scs'.
+        'dependable_rainfall', 'farmwest', 'usda_scs', 'suet', or 'ensemble'.
         
     Returns
     -------
@@ -412,6 +560,8 @@ def get_method_function(method: PeffMethod):
         'dependable_rainfall': dependable_rainfall_effective_precip,
         'farmwest': farmwest_effective_precip,
         'usda_scs': usda_scs_effective_precip,
+        'suet': suet_effective_precip,
+        'ensemble': ensemble_effective_precip,
     }
     
     if method not in methods:
@@ -432,10 +582,12 @@ def list_available_methods() -> dict:
         Dictionary mapping method names to descriptions.
     """
     return {
-        'cropwat': 'USDA SCS method as implemented in FAO CROPWAT (default)',
-        'fao_aglw': 'FAO/AGLW formula from FAO Irrigation Paper No. 33',
+        'cropwat': 'CROPWAT method from FAO (default)',
+        'fao_aglw': 'FAO/AGLW Dependable Rainfall (80% exceedance)',
         'fixed_percentage': 'Simple fixed percentage method (default 70%)',
         'dependable_rainfall': 'FAO Dependable Rainfall at specified probability',
         'farmwest': r'FarmWest method: $P_{eff} = (P - 5) \times 0.75$',
         'usda_scs': 'USDA-SCS method with AWC and ETo (requires GEE assets)',
+        'suet': 'TAGEM-SuET method based on P - ETo (requires ETo asset)',
+        'ensemble': 'Ensemble mean of 6 methods (excludes SuET, requires AWC and ETo)',
     }

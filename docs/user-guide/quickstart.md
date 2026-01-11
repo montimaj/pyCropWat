@@ -85,7 +85,7 @@ ep = EffectivePrecipitation(
 
 ## Effective Precipitation Methods
 
-pyCropWat supports six methods for calculating effective precipitation:
+pyCropWat supports eight methods for calculating effective precipitation:
 
 | Method | Formula | Use Case |
 |--------|---------|----------|
@@ -95,11 +95,13 @@ pyCropWat supports six methods for calculating effective precipitation:
 | `dependable_rainfall` | Probability-scaled FAO method | Conservative estimates |
 | `farmwest` | Peff = (P - 5) × 0.75 | Pacific Northwest irrigation |
 | `usda_scs` | Uses AWC, ETo, and soil storage | Site-specific with soil data |
+| `suet` | P ≤ ETo: 0 <br> P - ETo < 75: P - ETo <br> else: 75 + f(P - ETo - 75) | TAGEM-SuET method (P - ETo with 75mm cap) |
+| `ensemble` | Mean of 6 methods (excludes TAGEM-SuET) | Robust multi-method estimate |
 
 **CLI:**
 
 ```bash
-# CROPWAT (default) - USDA SCS method
+# CROPWAT (default)
 pycropwat process --asset IDAHO_EPSCOR/TERRACLIMATE --band pr \
     --geometry roi.geojson --start-year 2020 --end-year 2023 \
     --method cropwat --output ./output
@@ -131,6 +133,13 @@ pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitatio
     --awc-asset projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite \
     --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \
     --rooting-depth 1.0 --output ./output
+
+# SuET method (requires ETo asset)
+pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitation_sum \
+    --geometry roi.geojson --start-year 2020 --end-year 2023 \
+    --scale-factor 1000 --method suet \
+    --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \
+    --output ./output
 ```
 
 **Python:**
@@ -140,7 +149,7 @@ from pycropwat import EffectivePrecipitation
 from pycropwat.methods import (
     cropwat_effective_precip, fao_aglw_effective_precip,
     fixed_percentage_effective_precip, dependable_rainfall_effective_precip,
-    farmwest_effective_precip, usda_scs_effective_precip
+    farmwest_effective_precip, usda_scs_effective_precip, suet_effective_precip
 )
 
 # Using different methods with numpy arrays
@@ -157,6 +166,9 @@ peff_farmwest = farmwest_effective_precip(precip)
 eto = np.array([80, 120, 180, 220])  # mm
 awc = np.array([0.15, 0.15, 0.15, 0.15])  # volumetric fraction
 peff_usda = usda_scs_effective_precip(precip, eto, awc, rooting_depth=1.0)
+
+# SuET method requires ETo array
+peff_suet = suet_effective_precip(precip, eto)
 ```
 
 ## Processing Specific Months
@@ -224,8 +236,13 @@ annual = agg.annual_aggregate(2020, method='sum', output_path='./annual_2020.tif
 # Seasonal aggregation
 summer = agg.seasonal_aggregate(2020, 'JJA', method='sum')
 
-# Growing season
-growing = agg.growing_season_aggregate(2020, start_month=4, end_month=10)
+# Growing season - Northern Hemisphere (April-October)
+growing_nh = agg.growing_season_aggregate(2020, start_month=4, end_month=10)
+
+# Growing season - Southern Hemisphere (October-March, cross-year)
+# When start_month > end_month, automatically aggregates across two years
+# This aggregates Oct 2020 - Mar 2021
+growing_sh = agg.growing_season_aggregate(2020, start_month=10, end_month=3)
 
 # Multi-year climatology
 climatology = agg.climatology(start_year=2000, end_year=2020)
@@ -427,7 +444,7 @@ outputs/
 
 ## Next Steps
 
-- **Try the Complete Workflow Example**: Run `python Examples/south_america_cropwat_example.py --analysis-only` to see all features in action using real Rio de la Plata basin data
+- **Try the Complete Workflow Example**: Run `python Examples/south_america_example.py --analysis-only` to see all features in action using real Rio de la Plata basin data
 - See [CLI Reference](cli.md) for complete command documentation
 - See [Python API](api.md) for advanced programmatic usage
 - See [Examples](../examples.md) for real-world use cases including the [Complete Workflow](../examples.md#example-12-complete-workflow)

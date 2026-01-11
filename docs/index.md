@@ -2,7 +2,7 @@
 
 **A Python Package for Computing Effective Precipitation Using Google Earth Engine Climate Data**
 
-[![Release](https://img.shields.io/badge/release-v1.0.5.post1-green.svg)](https://github.com/montimaj/pyCropWat/releases)
+[![Release](https://img.shields.io/badge/release-v1.1.0-green.svg)](https://github.com/montimaj/pyCropWat/releases)
 [![PyPI](https://img.shields.io/pypi/v/pycropwat.svg)](https://pypi.org/project/pycropwat/)
 [![Downloads](https://static.pepy.tech/badge/pycropwat/month)](https://pepy.tech/project/pycropwat)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18201620.svg)](https://doi.org/10.5281/zenodo.18201620)
@@ -28,10 +28,10 @@ pip install pycropwat
 pyCropWat is a Python package that calculates effective precipitation using multiple methodologies from any Google Earth Engine (GEE) climate dataset. It supports:
 
 - **Multiple GEE datasets**: Any ImageCollection from the [GEE Data Catalog](https://developers.google.com/earth-engine/datasets) or [Community Catalog](https://gee-community-catalog.org/) (e.g., ERA5-Land, TerraClimate, CHIRPS, GPM IMERG)
-- **Multiple Peff methods**: CROPWAT (USDA SCS), FAO/AGLW, Fixed Percentage, Dependable Rainfall, FarmWest, USDA-SCS
+- **Multiple Peff methods**: CROPWAT, FAO/AGLW, Fixed Percentage, Dependable Rainfall, FarmWest, USDA-SCS, TAGEM-SuET, Ensemble
 - **Flexible geometry inputs**: Shapefiles, GeoJSON, or GEE FeatureCollection assets
 - **Automatic chunked downloads**: Handles large regions that exceed GEE pixel limits
-- **Temporal aggregation**: Annual, seasonal, growing season, climatology
+- **Temporal aggregation**: Annual, seasonal, growing season (with cross-year support for Southern Hemisphere), climatology
 - **Statistical analysis**: Anomaly detection, trend analysis, zonal statistics
 - **Visualization**: Time series, maps, interactive HTML maps, dataset comparison
 - **Export options**: NetCDF, Cloud-Optimized GeoTIFFs
@@ -40,7 +40,7 @@ pyCropWat is a Python package that calculates effective precipitation using mult
 
 ## CROPWAT Formula
 
-The default effective precipitation is calculated using the USDA SCS method as implemented in FAO CROPWAT ([Smith, 1992](https://www.fao.org/sustainable-development-goals-helpdesk/champion/article-detail/cropwat/en); [Muratoglu et al., 2023](https://doi.org/10.1016/j.watres.2023.120011)):
+The default effective precipitation is calculated using the CROPWAT method ([Smith, 1992](https://www.fao.org/sustainable-development-goals-helpdesk/champion/article-detail/cropwat/en); [Muratoglu et al., 2023](https://doi.org/10.1016/j.watres.2023.120011)):
 
 $$
 P_{eff} = \begin{cases}
@@ -51,11 +51,11 @@ $$
 
 ## Effective Precipitation Methods
 
-pyCropWat supports four different methods for calculating effective precipitation:
+pyCropWat supports eight different methods for calculating effective precipitation:
 
-### 1. CROPWAT (USDA SCS) - Default
+### 1. CROPWAT - Default
 
-The USDA Soil Conservation Service method as implemented in FAO CROPWAT software. This is the most widely used method for irrigation planning.
+The default method used in FAO CROPWAT software. This is the most widely used method for irrigation planning.
 
 | Condition | Formula |
 |-----------|---------|
@@ -71,14 +71,14 @@ ep = EffectivePrecipitation(..., method='cropwat')
 
 ---
 
-### 2. FAO/AGLW
+### 2. FAO/AGLW (Dependable Rainfall)
 
-The FAO Land and Water Division (AGLW) formula from FAO Irrigation and Drainage Paper No. 33.
+The FAO Land and Water Division (AGLW) Dependable Rainfall formula, based on 80% probability exceedance, from FAO Irrigation and Drainage Paper No. 33.
 
 | Condition | Formula |
 |-----------|---------|
-| P ≤ 250 mm | $P_{eff} = \max(0.6P - 10, 0)$ |
-| P > 250 mm | $P_{eff} = 0.8P - 25$ |
+| P ≤ 70 mm | $P_{eff} = \max(0.6P - 10, 0)$ |
+| P > 70 mm | $P_{eff} = 0.8P - 24$ |
 
 **Usage:**
 ```python
@@ -106,21 +106,21 @@ ep = EffectivePrecipitation(..., method='fixed_percentage', method_params={'perc
 
 ### 4. Dependable Rainfall
 
-The FAO Dependable Rainfall method estimates the amount of rainfall that can be depended upon at a given probability level. More conservative than other methods.
+The FAO Dependable Rainfall method is the same as the FAO/AGLW method, based on 80% probability exceedance. It estimates the amount of rainfall that can be depended upon at a given probability level.
 
-| Condition | Formula (at 75% probability) |
+| Condition | Formula (at 80% probability) |
 |-----------|------------------------------|
-| P < 100 mm | $P_{eff} = \max(0.6P - 10, 0)$ |
-| P ≥ 100 mm | $P_{eff} = 0.8P - 25$ |
+| P ≤ 70 mm | $P_{eff} = \max(0.6P - 10, 0)$ |
+| P > 70 mm | $P_{eff} = 0.8P - 24$ |
 
 A probability scaling factor is applied for other probability levels:
-- 50% probability: ~1.2× base estimate
-- 75% probability: 1.0× base estimate (default)
-- 90% probability: ~0.8× base estimate
+- 50% probability: ~1.3× base estimate
+- 80% probability: 1.0× base estimate (default)
+- 90% probability: ~0.9× base estimate
 
 **Usage:**
 ```python
-ep = EffectivePrecipitation(..., method='dependable_rainfall', method_params={'probability': 0.75})
+ep = EffectivePrecipitation(..., method='dependable_rainfall', method_params={'probability': 0.80})
 ```
 
 **Reference:** FAO. (1992). *CROPWAT - A computer program for irrigation planning and management*. FAO Irrigation and Drainage Paper No. 46.
@@ -185,24 +185,108 @@ pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitatio
 
 ---
 
+### 7. TAGEM-SuET (with ETo)
+
+The TAGEM-SuET (Türkiye'de Sulanan Bitkilerin Bitki Su Tüketimleri - Turkish Irrigation Management and Plant Water Consumption System) method calculates effective precipitation based on the difference between precipitation and reference evapotranspiration. When precipitation exceeds ETo, the excess becomes effective precipitation.
+
+**Formula:**
+
+$$
+P_{eff} = \begin{cases}
+0 & \text{if } P \leq ET_o \\
+P - ET_o & \text{if } P > ET_o \text{ and } (P - ET_o) < 75 \\
+75 + 0.0011(P - ET_o - 75)^2 + 0.44(P - ET_o - 75) & \text{otherwise}
+\end{cases}
+$$
+
+!!! warning "Performance Note"
+    Studies have shown that the TAGEM-SuET method tends to underperform compared to other methods, particularly in arid and semi-arid climates where ETo often exceeds precipitation. In our method comparison analyses, TAGEM-SuET consistently produced the lowest effective precipitation estimates. Users should consider this limitation when selecting a method for their application.
+
+**Reference:** [Muratoglu, A., Bilgen, G. K., Angin, I., & Kodal, S. (2023). Performance analyses of effective rainfall estimation methods for accurate quantification of agricultural water footprint. *Water Research*, 238, 120011.](https://doi.org/10.1016/j.watres.2023.120011)
+
+**Usage:**
+```python
+ep = EffectivePrecipitation(..., method='suet', method_params={
+    'eto_asset': 'projects/openet/assets/reference_et/conus/gridmet/monthly/v1',
+    'eto_band': 'eto'
+})
+```
+
+**Usage (CLI):**
+```bash
+pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitation_sum \
+    --method suet \
+    --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \
+    --eto-band eto ...
+```
+
+---
+
+### 8. Ensemble (Mean of Methods)
+
+The ensemble method provides a robust estimate by calculating the mean of six methods, excluding TAGEM-SuET which has been shown to underperform in comparative analyses. This multi-method average reduces bias from any single method.
+
+**Included Methods:**
+
+1. CROPWAT - FAO standard method
+2. FAO/AGLW - Dependable Rainfall (80% exceedance)
+3. Fixed Percentage - 70% of precipitation
+4. Dependable Rainfall - 75% probability level
+5. FarmWest - Pacific Northwest method
+6. USDA-SCS - Soil-based method
+
+**Formula:**
+
+$$P_{eff}^{ensemble} = \frac{P_{eff}^{cropwat} + P_{eff}^{fao\_aglw} + P_{eff}^{fixed} + P_{eff}^{dependable} + P_{eff}^{farmwest} + P_{eff}^{usda\_scs}}{6}$$
+
+!!! info "Recommended Method"
+    The ensemble method is recommended when users want a robust, multi-method average that reduces bias from any single method. It requires AWC and ETo assets (same as USDA-SCS) since it internally calculates all component methods.
+
+**Required GEE Assets:** Same as USDA-SCS method (AWC and ETo).
+
+**Usage:**
+```python
+ep = EffectivePrecipitation(..., method='ensemble', method_params={
+    'awc_asset': 'projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite',
+    'awc_band': 'AWC',
+    'eto_asset': 'projects/openet/assets/reference_et/conus/gridmet/monthly/v1',
+    'eto_band': 'eto',
+    'rooting_depth': 1.0
+})
+```
+
+**Usage (CLI):**
+```bash
+pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitation_sum \
+    --method ensemble \
+    --awc-asset projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite --awc-band AWC \
+    --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \
+    --eto-band eto --rooting-depth 1.0 ...
+```
+
+---
+
 ### Method Comparison
 
 | Method | Use Case | Characteristics |
 |--------|----------|-----------------|
 | **CROPWAT** | General irrigation planning | Balanced, widely validated |
-| **FAO/AGLW** | Yield response studies | Similar to CROPWAT, slightly different curve |
+| **FAO/AGLW** | Yield response studies | FAO Dependable Rainfall (80% exceedance) |
 | **Fixed Percentage** | Quick estimates, calibration | Simple, requires local calibration |
-| **Dependable Rainfall** | Risk-averse planning | Conservative, probability-based |
+| **Dependable Rainfall** | Risk-averse planning | Same as FAO/AGLW, with probability scaling |
 | **FarmWest** | Pacific Northwest irrigation | Simple, accounts for interception loss |
 | **USDA-SCS** | Site-specific irrigation | Accounts for soil AWC and ETo |
+| **TAGEM-SuET** | ET-based irrigation planning | Based on P - ETo difference |
+| **Ensemble** | Robust multi-method estimate | Mean of 6 methods (excludes TAGEM-SuET) |
 
 !!! tip "Choosing a Method"
     - Use **CROPWAT** (default) for most irrigation planning applications
-    - Use **FAO/AGLW** when following FAO Irrigation Paper No. 33 guidelines
+    - Use **FAO/AGLW** or **Dependable Rainfall** when following FAO Irrigation Paper No. 33 guidelines (they use the same base formula)
     - Use **Fixed Percentage** when you have locally calibrated effectiveness values
-    - Use **Dependable Rainfall** for drought-sensitive crops or risk-averse planning
     - Use **FarmWest** for Pacific Northwest regions or when accounting for interception loss
     - Use **USDA-SCS** when soil AWC and ETo data are available for site-specific estimates
+    - Use **Ensemble** for robust multi-method estimates when soil and ETo data are available
+    - Use **TAGEM-SuET** with caution - this method tends to produce the lowest Peff estimates and may underperform in arid/semi-arid regions (see [Muratoglu et al., 2023](https://doi.org/10.1016/j.watres.2023.120011))
 
 ## Quick Start
 
@@ -263,15 +347,15 @@ viz.plot_time_series(2020, 2023, output_path='./timeseries.png')
 
 ### ✅ Implemented
 
-- 📊 **Multiple Peff methods**: CROPWAT, FAO/AGLW, Fixed Percentage, Dependable Rainfall, FarmWest, USDA-SCS
-- 🗓️ **Temporal aggregation**: Annual, seasonal, growing season, climatology
+- 📊 **Multiple Peff methods**: CROPWAT, FAO/AGLW, Fixed Percentage, Dependable Rainfall, FarmWest, USDA-SCS, TAGEM-SuET
+- 🗓️ **Temporal aggregation**: Annual, seasonal, growing season (with cross-year support), climatology
 - 📈 **Statistical analysis**: Anomaly detection, trend analysis (linear, Theil-Sen), zonal statistics
 - 📉 **Visualization**: Time series, climatology charts, maps, interactive HTML maps, dataset comparison (side-by-side, scatter, annual)
 - 📤 **Export options**: NetCDF with time dimension, Cloud-Optimized GeoTIFFs
 - 🌍 **Any GEE climate dataset** with precipitation band
 - 🗺️ **Flexible resolution control** (native or custom scale)
 - ⚡ **Parallel processing** with Dask
-- 🧩 **Automatic tiling** for large regions
+- 🧩 **Automatic tiling** for large regions (in-memory mosaicking)
 
 ### 🚧 Planned
 
@@ -324,7 +408,7 @@ The following visualizations are generated by the [complete workflow example](ex
   <img src="assets/examples/method_comparison/ERA5Land_method_maps_2020_01.png" width="100%" alt="Method Comparison Maps">
 </p>
 
-*Comparison of effective precipitation methods: CROPWAT, FAO/AGLW, Fixed Percentage (70%), Dependable Rainfall (75%), FarmWest, and USDA-SCS.*
+*Comparison of all 8 effective precipitation methods: CROPWAT, FAO/AGLW, Fixed Percentage (70%), Dependable Rainfall (80%), FarmWest, USDA-SCS, TAGEM-SuET, and Ensemble.*
 
 <p align="center">
   <img src="assets/examples/method_comparison/ERA5Land_method_curves.png" width="60%" alt="Method Curves">
@@ -363,6 +447,22 @@ The [Arizona workflow](examples.md#arizona-usda-scs-example) demonstrates U.S.-s
 
 *Left: August 2023 anomaly (monsoon). Center: August climatology. Right: Long-term trend with significance stippling.*
 
+### New Mexico Example (8-Method Comparison)
+
+The [New Mexico workflow](examples.md#example-12-new-mexico-prism-workflow) compares all 8 effective precipitation methods using PRISM data:
+
+<p align="center">
+  <img src="assets/examples/new_mexico/method_comparison/mean_annual_comparison_1986_2025.png" width="100%" alt="New Mexico Mean Annual Comparison">
+</p>
+
+*Mean annual effective precipitation (1986-2025) for all 8 methods: CROPWAT, FAO/AGLW, Fixed 70%, Dependable Rainfall, FarmWest, USDA-SCS, TAGEM-SuET, and Ensemble.*
+
+<p align="center">
+  <img src="assets/examples/new_mexico/method_comparison/method_curves_new_mexico.png" width="60%" alt="New Mexico Method Curves">
+</p>
+
+*Theoretical response curves for all 8 effective precipitation methods using New Mexico typical values (AWC=120mm/m, ETo=200mm/month).*
+
 ## Documentation
 
 For full documentation, visit [https://montimaj.github.io/pyCropWat](https://montimaj.github.io/pyCropWat)
@@ -378,20 +478,26 @@ For full documentation, visit [https://montimaj.github.io/pyCropWat](https://mon
     
     **Rio de la Plata Example (Global datasets):**
     ```bash
-    # Analysis only (using existing data)
-    python Examples/south_america_cropwat_example.py --analysis-only
+    # Full workflow with GEE processing (generates ~5 GB of output data)
+    python Examples/south_america_example.py --gee-project your-project-id --workers 8
     
-    # Full workflow with GEE processing
-    python Examples/south_america_cropwat_example.py --gee-project your-project-id --workers 8
+    # Analysis only (requires previously generated data)
+    python Examples/south_america_example.py --analysis-only
     ```
     
     **Arizona USDA-SCS Example (U.S. datasets):**
     ```bash
-    # Analysis only (using existing data)
-    python Examples/arizona_usda_scs_example.py --analysis-only
+    # Full workflow with GEE processing (generates ~12 GB of output data)
+    python Examples/arizona_example.py --gee-project your-project-id --workers 8
     
-    # Full workflow with GEE processing
-    python Examples/arizona_usda_scs_example.py --gee-project your-project-id --workers 8
+    # Analysis only (requires previously generated data)
+    python Examples/arizona_example.py --analysis-only
+    ```
+    
+    **New Mexico 8-Method Comparison:**
+    ```bash
+    # Full workflow with GEE processing (generates ~14 GB of output data)
+    python Examples/new_mexico_example.py --gee-project your-project-id --workers 8
     ```
 
 ## U.S.-Specific Datasets

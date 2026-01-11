@@ -72,12 +72,14 @@ pycropwat process [OPTIONS]
 
 | Method | Description |
 |--------|-------------|
-| `cropwat` | USDA SCS/CROPWAT method (default) |
-| `fao_aglw` | FAO AGLW formula |
+| `cropwat` | CROPWAT method from FAO (default) |
+| `fao_aglw` | FAO/AGLW Dependable Rainfall (80% exceedance) |
 | `fixed_percentage` | Fixed percentage of rainfall |
 | `dependable_rainfall` | Dependable rainfall approach |
 | `farmwest` | FarmWest method: Peff = (P - 5) × 0.75 |
 | `usda_scs` | USDA-SCS with AWC and ETo (requires additional assets) |
+| `suet` | TAGEM-SuET method: P - ETo with 75mm threshold (requires ETo asset) |
+| `ensemble` | Mean of 6 methods (excludes TAGEM-SuET; requires AWC and ETo) |
 
 ### Examples
 

@@ -65,7 +65,7 @@ pycropwat.methods : Effective precipitation calculation methods.
 import logging
 import warnings
 from pathlib import Path
-from typing import Union, Optional, List, Tuple, Literal
+from typing import Union, Optional, List, Tuple, Literal, Dict
 import numpy as np
 import xarray as xr
 import rioxarray
@@ -160,7 +160,8 @@ class TemporalAggregator:
     def _load_rasters(
         self,
         year: int,
-        months: List[int]
+        months: List[int],
+        year_for_month: Optional[Dict[int, int]] = None
     ) -> Optional[xr.DataArray]:
         """
         Load and stack rasters for specified months.
@@ -169,31 +170,44 @@ class TemporalAggregator:
         ----------
         
         year : int
-            Year to load.
+            Primary year to load (used for months not in year_for_month).
         
         months : list of int
             Months to load (1-12).
+        
+        year_for_month : dict, optional
+            Mapping of month -> year for cross-year aggregations.
+            E.g., {10: 2020, 11: 2020, 12: 2020, 1: 2021, 2: 2021, 3: 2021}
+            If None, all months are loaded from the primary year.
             
         Returns
         -------
         xr.DataArray or None
             Stacked DataArray with time dimension, or None if no data.
         """
-        if year not in self._index:
-            logger.warning(f"No data available for year {year}")
-            return None
-        
         arrays = []
         valid_months = []
+        time_labels = []
         
         for month in months:
-            if month in self._index[year]:
-                da = rioxarray.open_rasterio(self._index[year][month])
+            # Determine which year to use for this month
+            if year_for_month and month in year_for_month:
+                load_year = year_for_month[month]
+            else:
+                load_year = year
+            
+            if load_year not in self._index:
+                logger.warning(f"No data available for year {load_year}")
+                continue
+                
+            if month in self._index[load_year]:
+                da = rioxarray.open_rasterio(self._index[load_year][month])
                 da = da.squeeze('band', drop=True)
                 arrays.append(da)
                 valid_months.append(month)
+                time_labels.append(f"{load_year}-{month:02d}")
             else:
-                logger.warning(f"No data for {year}-{month:02d}")
+                logger.warning(f"No data for {load_year}-{month:02d}")
         
         if not arrays:
             return None
@@ -201,7 +215,7 @@ class TemporalAggregator:
         # Stack along new time dimension
         # Use join='override' to handle slight coordinate differences between files
         stacked = xr.concat(arrays, dim='time', join='override')
-        stacked = stacked.assign_coords(time=valid_months)
+        stacked = stacked.assign_coords(time=time_labels)
         
         return stacked
     
@@ -316,7 +330,8 @@ class TemporalAggregator:
         months: List[int],
         method: AggregationType = 'sum',
         output_path: Optional[Union[str, Path]] = None,
-        output_name: Optional[str] = None
+        output_name: Optional[str] = None,
+        cross_year: bool = False
     ) -> Optional[xr.DataArray]:
         """
         Calculate custom temporal aggregate of effective precipitation.
@@ -325,10 +340,13 @@ class TemporalAggregator:
         ----------
         
         year : int
-            Year to aggregate.
+            Starting year to aggregate. For cross-year aggregations (e.g.,
+            Southern Hemisphere growing season Oct-Mar), this is the year
+            containing the first months.
         
         months : list of int
-            List of months to include (1-12).
+            List of months to include (1-12). For cross-year aggregations,
+            list months in chronological order (e.g., [10, 11, 12, 1, 2, 3]).
         
         method : str, optional
             Aggregation method: 'sum', 'mean', 'min', 'max', 'std'.
@@ -339,20 +357,52 @@ class TemporalAggregator:
         
         output_name : str, optional
             Name for output attributes.
+        
+        cross_year : bool, optional
+            If True, handles seasons that span two calendar years.
+            Months after the "wrap point" (where month number decreases)
+            are loaded from year+1. Default is False.
             
         Returns
         -------
         xr.DataArray or None
             Aggregated data, or None if insufficient data.
+            
+        Examples
+        --------
+        Northern Hemisphere growing season (same year):
+        >>> agg.custom_aggregate(2020, months=[4, 5, 6, 7, 8, 9])
+        
+        Southern Hemisphere growing season (cross-year, Oct 2020 - Mar 2021):
+        >>> agg.custom_aggregate(2020, months=[10, 11, 12, 1, 2, 3], cross_year=True)
         """
-        stacked = self._load_rasters(year, months)
+        year_for_month = None
+        
+        if cross_year:
+            # Build year mapping for cross-year aggregations
+            # Detect where months wrap around (e.g., 12 -> 1)
+            year_for_month = {}
+            current_year = year
+            prev_month = 0
+            
+            for month in months:
+                if month < prev_month:
+                    # Month wrapped around to next year
+                    current_year = year + 1
+                year_for_month[month] = current_year
+                prev_month = month
+        
+        stacked = self._load_rasters(year, months, year_for_month=year_for_month)
         if stacked is None:
             return None
         
         result = self._apply_aggregation(stacked, method)
         result.attrs['year'] = year
+        if cross_year:
+            result.attrs['end_year'] = year + 1
         result.attrs['months'] = months
         result.attrs['aggregation'] = method
+        result.attrs['cross_year'] = cross_year
         if output_name:
             result.attrs['name'] = output_name
         
@@ -373,17 +423,23 @@ class TemporalAggregator:
         """
         Calculate growing season aggregate.
         
+        Automatically handles cross-year seasons (e.g., Southern Hemisphere
+        Oct-Mar) when start_month > end_month.
+        
         Parameters
         ----------
         
         year : int
-            Year to aggregate.
+            Starting year to aggregate. For cross-year seasons, this is the
+            year containing start_month (e.g., 2020 for Oct 2020 - Mar 2021).
         
         start_month : int, optional
             Growing season start month (1-12). Default is 4 (April).
         
         end_month : int, optional
             Growing season end month (1-12). Default is 10 (October).
+            If end_month < start_month, assumes cross-year season
+            (e.g., start=10, end=3 means Oct-Mar spanning two years).
         
         method : str, optional
             Aggregation method. Default is 'sum'.
@@ -395,14 +451,34 @@ class TemporalAggregator:
         -------
         xr.DataArray or None
             Aggregated data.
+            
+        Examples
+        --------
+        Northern Hemisphere (Apr-Oct, same year):
+        >>> agg.growing_season_aggregate(2020, start_month=4, end_month=10)
+        
+        Southern Hemisphere (Oct-Mar, cross-year):
+        >>> agg.growing_season_aggregate(2020, start_month=10, end_month=3)
+        # This aggregates Oct 2020 - Mar 2021
         """
-        months = list(range(start_month, end_month + 1))
+        # Detect cross-year season (start_month > end_month)
+        if start_month > end_month:
+            # Cross-year season (e.g., Oct-Mar for Southern Hemisphere)
+            # Build month list: [10, 11, 12, 1, 2, 3]
+            months = list(range(start_month, 13)) + list(range(1, end_month + 1))
+            cross_year = True
+        else:
+            # Same-year season (e.g., Apr-Oct for Northern Hemisphere)
+            months = list(range(start_month, end_month + 1))
+            cross_year = False
+        
         return self.custom_aggregate(
             year,
             months=months,
             method=method,
             output_path=output_path,
-            output_name=f'growing_season_{start_month:02d}_{end_month:02d}'
+            output_name=f'growing_season_{start_month:02d}_{end_month:02d}',
+            cross_year=cross_year
         )
     
     def _apply_aggregation(
