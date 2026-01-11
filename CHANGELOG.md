@@ -2,7 +2,7 @@
 
 All notable changes to pyCropWat will be documented in this file.
 
-## [1.1.1.post1] - 2026-01-11
+## [1.1.1.post2] - 2026-01-11
 
 ### 🔧 Improvements
 - **Default Method Changed**: Changed default method from `cropwat` to `ensemble` for more robust multi-method estimates

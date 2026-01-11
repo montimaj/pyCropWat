@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pycropwat"
-version = "1.1.1.post1"
+version = "1.1.1.post2"
 description = "A Python Package for Computing Effective Precipitation Using Google Earth Engine Climate Data"
 readme = "README.md"
 license = {text = "MIT"}
