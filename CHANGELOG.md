@@ -2,6 +2,13 @@
 
 All notable changes to pyCropWat will be documented in this file.
 
+## [1.1.1.post3] - 2026-01-12
+
+### 📚 Documentation
+- **FarmWest Reference Fix**: Removed incorrect Washington State University attribution from FarmWest method descriptions
+
+---
+
 ## [1.1.1.post2] - 2026-01-11
 
 ### 🔧 Improvements

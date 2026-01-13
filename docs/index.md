@@ -3,7 +3,7 @@
   <img src="assets/pyCropWat_logo.png" alt="pyCropWat Logo" width="200"><br>
 </p>
 
-[![Release](https://img.shields.io/badge/release-v1.1.1--post2-green.svg)](https://github.com/montimaj/pyCropWat/releases)
+[![Release](https://img.shields.io/badge/release-v1.1.1--post3-green.svg)](https://github.com/montimaj/pyCropWat/releases)
 [![PyPI](https://img.shields.io/pypi/v/pycropwat.svg)](https://pypi.org/project/pycropwat/)
 [![Downloads](https://static.pepy.tech/badge/pycropwat/month)](https://pepy.tech/project/pycropwat)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18201620.svg)](https://doi.org/10.5281/zenodo.18201620)
@@ -128,7 +128,7 @@ ep = EffectivePrecipitation(..., method='dependable_rainfall', method_params={'p
 
 ### 5. FarmWest
 
-A simple empirical formula used by Washington State University's FarmWest program for irrigation scheduling in the Pacific Northwest.
+A simple empirical formula used by [FarmWest program](https://farmwest.com/climate/calculator-information/et/effective-precipitation/) for irrigation scheduling in the Pacific Northwest.
 
 $$P_{eff} = \max((P - 5) \times 0.75, 0)$$
 
@@ -139,7 +139,7 @@ The method assumes the first 5 mm is lost to interception/evaporation, and 75% o
 ep = EffectivePrecipitation(..., method='farmwest')
 ```
 
-**Reference:** FarmWest. [Effective Precipitation](https://farmwest.com/climate/calculator-information/et/effective-precipitation/). Washington State University.
+**Reference:** FarmWest. [Effective Precipitation](https://farmwest.com/climate/calculator-information/et/effective-precipitation/).
 
 ---
 

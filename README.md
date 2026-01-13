@@ -1,6 +1,6 @@
 # pyCropWat
 
-[![Release](https://img.shields.io/badge/release-v1.1.1--post2-green.svg)](https://github.com/montimaj/pyCropWat/releases)
+[![Release](https://img.shields.io/badge/release-v1.1.1--post3-green.svg)](https://github.com/montimaj/pyCropWat/releases)
 [![PyPI](https://img.shields.io/pypi/v/pycropwat.svg)](https://pypi.org/project/pycropwat/)
 [![Downloads](https://static.pepy.tech/badge/pycropwat/month)](https://pepy.tech/project/pycropwat)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18201620.svg)](https://doi.org/10.5281/zenodo.18201620)
@@ -164,7 +164,7 @@ A probability scaling factor is applied:
 
 ### FarmWest Method
 
-A simple empirical formula used by Washington State University's FarmWest program:
+A simple empirical formula used by the [FarmWest](https://farmwest.com/climate/calculator-information/et/effective-precipitation/) program:
 
 - `Peff = max((P - 5) × 0.75, 0)`
 

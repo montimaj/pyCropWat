@@ -47,7 +47,7 @@ Effective Precipitation Methods
 - ``'fao_aglw'`` - FAO Dependable Rainfall (80% exceedance)
 - ``'fixed_percentage'`` - Simple fixed percentage method
 - ``'dependable_rainfall'`` - FAO Dependable Rainfall method
-- ``'farmwest'`` - Washington State University FarmWest method
+- ``'farmwest'`` - FarmWest method
 - ``'usda_scs'`` - USDA-SCS soil moisture depletion method
 - ``'suet'`` - TAGEM-SuET method (Turkish Irrigation Management System)
 
@@ -89,7 +89,7 @@ from .analysis import (
     export_to_cog,
 )
 
-__version__ = "1.1.1.post2"
+__version__ = "1.1.1.post3"
 __all__ = [
     # Core
     "EffectivePrecipitation",

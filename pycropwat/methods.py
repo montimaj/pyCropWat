@@ -271,7 +271,7 @@ def farmwest_effective_precip(pr: np.ndarray) -> np.ndarray:
     r"""
     Calculate effective precipitation using the FarmWest method.
     
-    This is a simple empirical formula used by Washington State University's
+    This is a simple empirical formula used by the
     FarmWest program for irrigation scheduling in the Pacific Northwest.
     
     Formula

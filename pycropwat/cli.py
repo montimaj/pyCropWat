@@ -507,7 +507,7 @@ def create_parser():
     parser.add_argument(
         '--version',
         action='version',
-        version='%(prog)s 1.1.1.post2'
+        version='%(prog)s 1.1.1.post3'
     )
     
     parser.add_argument(

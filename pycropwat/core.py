@@ -11,7 +11,7 @@ The module supports multiple effective precipitation methods:
 - **FAO/AGLW**: FAO Dependable Rainfall (80% exceedance)
 - **Fixed Percentage**: Simple fixed percentage method
 - **Dependable Rainfall**: FAO Dependable Rainfall method
-- **FarmWest**: Washington State University FarmWest method
+- **FarmWest**: FarmWest method
 - **USDA-SCS**: Soil moisture depletion method (requires AWC and ETo)
 
 Example
@@ -127,7 +127,7 @@ class EffectivePrecipitation:
         - ``'fao_aglw'`` - FAO Dependable Rainfall (80% exceedance)
         - ``'fixed_percentage'`` - Simple fixed percentage method
         - ``'dependable_rainfall'`` - FAO Dependable Rainfall method
-        - ``'farmwest'`` - Washington State University FarmWest method
+        - ``'farmwest'`` - FarmWest method
         - ``'usda_scs'`` - USDA-SCS soil moisture depletion method
           (requires AWC and ETo data via method_params)
         - ``'suet'`` - TAGEM-SuET method (Turkish Irrigation Management System)
