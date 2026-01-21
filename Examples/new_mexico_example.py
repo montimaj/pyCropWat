@@ -12,7 +12,14 @@ The workflow includes:
 4. Statistical analysis (anomalies, trends)
 5. Visualization of method differences
 
-This approach is more efficient than downloading for each method separately.
+IrrMapper Workflow (Native Resolution ~800m):
+The script also includes an IrrMapper workflow that:
+1. Applies the IrrMapper irrigated lands mask at native PRISM resolution (~800m)
+2. Downloads precipitation, AWC (SSURGO), and ETo (gridMET) with mask
+3. Calculates 7 effective precipitation methods (excluding SuET)
+4. Compares methods within irrigated areas only with CV visualization
+
+This approach is efficient as it works at native PRISM resolution.
 
 Precipitation Data Source:
 - PRISM (projects/sat-io/open-datasets/OREGONSTATE/PRISM_800_MONTHLY) - ~800m monthly
@@ -21,15 +28,17 @@ USDA-SCS Required Data (US):
 - AWC: SSURGO (projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite)
 - ETo: gridMET Monthly (projects/openet/assets/reference_et/conus/gridmet/monthly/v1)
 
-Effective Precipitation Methods Compared:
-- Ensemble - Mean of 6 methods (default, excludes TAGEM-SuET)
+IrrMapper Dataset:
+- IrrMapper (UMT/Climate/IrrMapper_RF/v1_2) - 30m binary mask, resampled to PRISM scale
+
+Effective Precipitation Methods Compared (7 methods):
+- Ensemble - Mean of 6 methods (excludes SuET)
 - CROPWAT - Method from FAO CROPWAT
 - FAO/AGLW - FAO Dependable Rainfall (80% exceedance)
 - Fixed Percentage (70%) - Simple empirical method
 - Dependable Rainfall (80% probability) - Statistical approach
 - FarmWest - WSU irrigation scheduling formula
 - USDA-SCS - Site-specific method with AWC and ETo (SSURGO + gridMET)
-- TAGEM-SuET - Turkish Irrigation Management System based on P - ETo
 
 Study Area:
 - New Mexico (NM.geojson)
@@ -43,6 +52,10 @@ Usage:
     python new_mexico_example.py -f -w 8  # Force reprocess with 8 workers
     python new_mexico_example.py --analysis-only
     python new_mexico_example.py --gee-project your-project-id
+    
+    # IrrMapper Workflow at Native Resolution:
+    python new_mexico_example.py --irrmapper
+    python new_mexico_example.py --irrmapper -f -w 8 --start-year 2015 --end-year 2020
 """
 
 import os
@@ -1423,6 +1436,924 @@ def run_analysis_only(comparison_only: bool = False):
     logger.info("\nAnalysis workflow complete!")
 
 
+# =============================================================================
+# IrrMapper Masked Workflow (Native Resolution)
+# =============================================================================
+
+# IrrMapper Configuration
+IRRMAPPER_ASSET = "UMT/Climate/IrrMapper_RF/v1_2"
+
+# IrrMapper output directories (native PRISM resolution ~800m)
+IRRMAPPER_DIR = REGION_DIR / 'NM_PRISM_IrrMapper'
+IRRMAPPER_INPUT_DIR = REGION_DIR / 'analysis_inputs_irrmapper'
+IRRMAPPER_ANALYSIS_DIR = REGION_DIR / 'analysis_outputs_irrmapper'
+IRRMAPPER_METHOD_COMPARISON_DIR = IRRMAPPER_ANALYSIS_DIR / 'method_comparison'
+
+# Methods to compare (7 methods, excluding SuET)
+IRRMAPPER_METHODS = ['cropwat', 'fao_aglw', 'fixed_percentage', 'dependable_rainfall', 
+                     'farmwest', 'usda_scs', 'ensemble']
+
+
+def create_irrmapper_output_directories():
+    """Create output directories for IrrMapper masked workflow."""
+    directories = [
+        IRRMAPPER_DIR,
+        IRRMAPPER_INPUT_DIR,
+        IRRMAPPER_ANALYSIS_DIR,
+        IRRMAPPER_METHOD_COMPARISON_DIR
+    ]
+    
+    for method in IRRMAPPER_METHODS:
+        directories.append(IRRMAPPER_ANALYSIS_DIR / 'peff_by_method' / method)
+        directories.append(IRRMAPPER_ANALYSIS_DIR / 'annual' / method)
+    
+    for d in directories:
+        d.mkdir(parents=True, exist_ok=True)
+    
+    logger.info(f"IrrMapper output directories created in {IRRMAPPER_DIR}")
+
+
+def download_prism_with_irrmapper_mask(
+    start_year: int = None,
+    end_year: int = None,
+    skip_if_exists: bool = True,
+    n_workers: int = 4
+):
+    """
+    Download PRISM precipitation data at native resolution with IrrMapper mask.
+    
+    This function:
+    1. Downloads PRISM precipitation at native ~800m resolution
+    2. Applies the IrrMapper mask (resampled to PRISM resolution)
+    3. Downloads USDA-SCS required data (AWC from SSURGO, ETo from gridMET)
+    4. Saves all data for effective precipitation calculation
+    
+    This is much faster than the 30m workflow as it uses native resolution.
+    
+    Parameters
+    ----------
+    start_year : int, optional
+        Start year for processing. Defaults to module START_YEAR.
+    end_year : int, optional
+        End year for processing. Defaults to module END_YEAR.
+    skip_if_exists : bool
+        Skip processing if output files already exist.
+    n_workers : int
+        Number of parallel workers for tile downloading.
+        
+    Notes
+    -----
+    IrrMapper dataset: UMT/Climate/IrrMapper_RF/v1_2
+    - Binary classification (1 = irrigated, 0 = not irrigated)
+    - Native resolution: 30m (Landsat-based), resampled to PRISM ~800m
+    """
+    import ee
+    import numpy as np
+    import xarray as xr
+    import rioxarray
+    from pycropwat.utils import initialize_gee, load_geometry
+    
+    # Use module defaults if not specified
+    proc_start_year = start_year if start_year is not None else START_YEAR
+    proc_end_year = end_year if end_year is not None else END_YEAR
+    
+    # Check if data already exists
+    if skip_if_exists and IRRMAPPER_DIR.exists():
+        existing_files = list(IRRMAPPER_DIR.glob('precip_[0-9]*.tif'))
+        expected_files = (proc_end_year - proc_start_year + 1) * 12
+        if len(existing_files) >= expected_files * 0.9:
+            logger.info(f"Skipping download - data already exists ({len(existing_files)} files)")
+            return
+    
+    create_irrmapper_output_directories()
+    
+    logger.info("=" * 60)
+    logger.info("Downloading PRISM data at native resolution with IrrMapper mask")
+    logger.info(f"Period: {proc_start_year}-{proc_end_year}")
+    logger.info("=" * 60)
+    
+    # Initialize GEE
+    initialize_gee(GEE_PROJECT)
+    
+    # Load study area geometry
+    geometry = load_geometry(STUDY_AREA_GEOJSON)
+    bounds = geometry.bounds()
+    
+    # Get PRISM native scale
+    prism_coll = ee.ImageCollection(PRISM_CONFIG['asset_id'])
+    prism_scale = prism_coll.first().projection().nominalScale().getInfo()
+    logger.info(f"PRISM native scale: {prism_scale}m")
+    
+    # Check PRISM date range
+    prism_dates = prism_coll.aggregate_array('system:time_start').getInfo()
+    if prism_dates:
+        import datetime
+        prism_start = datetime.datetime.fromtimestamp(min(prism_dates)/1000)
+        prism_end = datetime.datetime.fromtimestamp(max(prism_dates)/1000)
+        logger.info(f"PRISM available: {prism_start.year}-{prism_end.year}")
+        
+        # Adjust date range if needed
+        if proc_start_year < prism_start.year:
+            logger.warning(f"Adjusting start year from {proc_start_year} to {prism_start.year} (PRISM data availability)")
+            proc_start_year = prism_start.year
+        if proc_end_year > prism_end.year:
+            logger.warning(f"Adjusting end year from {proc_end_year} to {prism_end.year} (PRISM data availability)")
+            proc_end_year = prism_end.year
+    
+    # Load IrrMapper mask collection
+    logger.info(f"Loading IrrMapper mask from {IRRMAPPER_ASSET}")
+    irrmapper = ee.ImageCollection(IRRMAPPER_ASSET)
+    
+    # Load PRISM collection
+    prism = prism_coll.select(PRISM_CONFIG['precip_band'])
+    
+    # Load AWC data (SSURGO)
+    logger.info(f"Loading AWC from {AWC_ASSET}")
+    awc_img = ee.Image(AWC_ASSET).reproject(
+        crs='EPSG:4326',
+        scale=prism_scale
+    ).rename('awc')
+    
+    # Load ETo collection (gridMET monthly)
+    logger.info(f"Loading ETo from {ETO_ASSET}")
+    eto_collection = ee.ImageCollection(ETO_ASSET).select(ETO_BAND)
+    
+    # Download AWC once (static data)
+    awc_file = IRRMAPPER_INPUT_DIR / 'awc.tif'
+    if not awc_file.exists():
+        logger.info("Downloading AWC data...")
+        _download_native_image_to_tiff(
+            awc_img, geometry, prism_scale,
+            awc_file, 'awc',
+            default_value=0.15, description="AWC", n_workers=n_workers
+        )
+    
+    # Process each month
+    for year in range(proc_start_year, proc_end_year + 1):
+        # Get IrrMapper mask for this year
+        # IrrMapper RF v1.2: classification 0 = irrigated, 1 = non-irrigated, 2 = uncultivated
+        irrmapper_year = irrmapper.filter(
+            ee.Filter.calendarRange(year, year, 'year')
+        ).select('classification')
+        
+        # Check if data exists for this year
+        irrmapper_count = irrmapper_year.size().getInfo()
+        if irrmapper_count == 0:
+            logger.warning(f"No IrrMapper data for {year}, using mosaic of all available")
+            irrmapper_year = irrmapper.select('classification').mosaic()
+        else:
+            irrmapper_year = irrmapper_year.max()
+        
+        # Create binary mask: 1 where irrigated (classification == 0)
+        # Simple reproject to PRISM scale - uses nearest neighbor by default
+        irrmapper_mask = irrmapper_year.eq(0).reproject(
+            crs='EPSG:4326',
+            scale=prism_scale
+        )
+        
+        for month in range(1, 13):
+            precip_file = IRRMAPPER_DIR / f'precip_{year}_{month:02d}.tif'
+            eto_file = IRRMAPPER_INPUT_DIR / f'eto_{year}_{month:02d}.tif'
+            
+            if skip_if_exists and precip_file.exists() and eto_file.exists():
+                if month == 1:
+                    logger.info(f"Skipping {year} - files already exist")
+                continue
+            
+            logger.info(f"Processing {year}-{month:02d}...")
+            
+            # Get PRISM image for this month
+            import calendar
+            _, days_in_month = calendar.monthrange(year, month)
+            start_date = f"{year}-{month:02d}-01"
+            end_date = f"{year}-{month:02d}-{days_in_month}"
+            
+            prism_monthly = prism.filterDate(start_date, end_date).sum().rename('precip')
+            
+            # Apply IrrMapper mask: multiply by mask (1 for irrigated, 0 for non-irrigated)
+            # Result: original precip where irrigated, 0 where not irrigated
+            prism_masked = prism_monthly.multiply(irrmapper_mask).rename('precip')
+            
+            # Download precipitation
+            if not precip_file.exists():
+                try:
+                    _download_native_image_to_tiff(
+                        prism_masked, geometry, prism_scale,
+                        precip_file, 'precip',
+                        default_value=0, description=f"Precipitation {year}-{month:02d}", n_workers=n_workers
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to download Precipitation {year}-{month:02d}: {e}")
+                    continue
+            
+            # Get ETo for this month
+            if not eto_file.exists():
+                try:
+                    eto_filtered = eto_collection.filterDate(start_date, end_date)
+                    eto_count = eto_filtered.size().getInfo()
+                    if eto_count > 0:
+                        eto_monthly = eto_filtered.first()
+                        eto_resampled = eto_monthly.reproject(
+                            crs='EPSG:4326',
+                            scale=prism_scale
+                        ).rename('eto')
+                        
+                        # Apply same mask to ETo: multiply by mask
+                        eto_masked = eto_resampled.multiply(irrmapper_mask).rename('eto')
+                        
+                        _download_native_image_to_tiff(
+                            eto_masked, geometry, prism_scale,
+                            eto_file, 'eto',
+                            default_value=0, description=f"ETo {year}-{month:02d}", n_workers=n_workers
+                        )
+                    else:
+                        logger.warning(f"No ETo data available for {year}-{month:02d}")
+                except Exception as e:
+                    logger.error(f"Failed to download ETo {year}-{month:02d}: {e}")
+    
+    logger.info("Completed PRISM download with IrrMapper mask at native resolution")
+
+
+def _download_native_image_to_tiff(
+    image: 'ee.Image',
+    geometry: 'ee.Geometry',
+    scale: float,
+    output_path: 'Path',
+    band_name: str,
+    default_value: float = 0,
+    description: str = "data",
+    n_workers: int = 4
+):
+    """
+    Download a GEE image at native scale and save as GeoTIFF.
+    
+    Uses parallel tiled download for large regions to avoid GEE pixel limits.
+    """
+    import ee
+    import numpy as np
+    import xarray as xr
+    import rioxarray
+    
+    try:
+        bounds = geometry.bounds()
+        bounds_coords = bounds.getInfo()['coordinates'][0]
+        
+        min_lon = min(c[0] for c in bounds_coords)
+        max_lon = max(c[0] for c in bounds_coords)
+        min_lat = min(c[1] for c in bounds_coords)
+        max_lat = max(c[1] for c in bounds_coords)
+        
+        # Estimate pixel count
+        mid_lat = (min_lat + max_lat) / 2
+        lat_meters_per_deg = 111320
+        lon_meters_per_deg = 111320 * np.cos(np.radians(mid_lat))
+        
+        width_meters = (max_lon - min_lon) * lon_meters_per_deg
+        height_meters = (max_lat - min_lat) * lat_meters_per_deg
+        
+        n_cols = int(np.ceil(width_meters / scale))
+        n_rows = int(np.ceil(height_meters / scale))
+        estimated_pixels = n_cols * n_rows
+        
+        MAX_PIXELS = 65536  # 256 x 256
+        
+        if estimated_pixels <= MAX_PIXELS:
+            # Direct download
+            arr = image.sampleRectangle(
+                region=bounds,
+                defaultValue=default_value
+            ).get(band_name).getInfo()
+            
+            if arr is None:
+                logger.warning(f"No data for {description}, using default value")
+                arr = np.full((n_rows, n_cols), default_value, dtype=np.float32)
+            else:
+                arr = np.array(arr, dtype=np.float32)
+        else:
+            # Parallel tiled download for large regions
+            logger.info(f"Large region ({estimated_pixels} pixels), using parallel tiled download for {description}...")
+            arr = _download_image_tiled_native(
+                image, bounds_coords, scale, band_name, default_value, description, n_workers
+            )
+        
+        # Create coordinates
+        lats = np.linspace(max_lat, min_lat, arr.shape[0])
+        lons = np.linspace(min_lon, max_lon, arr.shape[1])
+        
+        # Create xarray DataArray
+        da = xr.DataArray(
+            arr,
+            dims=['y', 'x'],
+            coords={'y': lats, 'x': lons},
+            attrs={
+                'units': 'mm' if band_name in ['precip', 'eto'] else 'fraction',
+                'long_name': band_name,
+                'scale': scale
+            }
+        )
+        da = da.rio.write_crs("EPSG:4326")
+        da.rio.to_raster(output_path)
+        
+        logger.info(f"Saved {description}: {output_path.name} (shape: {arr.shape})")
+        
+    except Exception as e:
+        logger.error(f"Failed to download {description}: {e}")
+        raise
+
+
+def _download_single_tile(
+    image: 'ee.Image',
+    tile: 'ee.Geometry',
+    band_name: str,
+    default_value: float
+) -> 'tuple':
+    """Download a single tile from GEE. Returns (arr, coords) or (None, None)."""
+    import ee
+    import numpy as np
+    
+    try:
+        arr = image.sampleRectangle(
+            region=tile,
+            defaultValue=default_value
+        ).get(band_name).getInfo()
+        
+        if arr is not None:
+            arr = np.array(arr, dtype=np.float32)
+            coords = tile.getInfo()['coordinates'][0]
+            return arr, coords
+    except Exception as e:
+        logger.debug(f"Tile failed: {e}")
+    
+    return None, None
+
+
+def _download_image_tiled_native(
+    image: 'ee.Image',
+    bounds_coords: list,
+    scale: float,
+    band_name: str,
+    default_value: float,
+    description: str,
+    n_workers: int = 4
+) -> 'np.ndarray':
+    """Download a large image using parallel tiled approach."""
+    import ee
+    import numpy as np
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    
+    min_lon = min(c[0] for c in bounds_coords)
+    max_lon = max(c[0] for c in bounds_coords)
+    min_lat = min(c[1] for c in bounds_coords)
+    max_lat = max(c[1] for c in bounds_coords)
+    
+    # Calculate tile size (256 pixels per side)
+    tile_pixels = 256
+    mid_lat = (min_lat + max_lat) / 2
+    lat_meters_per_deg = 111320
+    lon_meters_per_deg = 111320 * np.cos(np.radians(mid_lat))
+    
+    tile_height_deg = (tile_pixels * scale) / lat_meters_per_deg
+    tile_width_deg = (tile_pixels * scale) / lon_meters_per_deg
+    
+    # Create tiles
+    tiles = []
+    lat = min_lat
+    while lat < max_lat:
+        lon = min_lon
+        while lon < max_lon:
+            tile_max_lat = min(lat + tile_height_deg, max_lat)
+            tile_max_lon = min(lon + tile_width_deg, max_lon)
+            tiles.append(ee.Geometry.Rectangle([lon, lat, tile_max_lon, tile_max_lat]))
+            lon += tile_width_deg
+        lat += tile_height_deg
+    
+    logger.info(f"Downloading {description} in {len(tiles)} tiles using {n_workers} workers...")
+    
+    # Download tiles in parallel
+    tile_arrays = []
+    tile_coords = []
+    completed = 0
+    
+    with ThreadPoolExecutor(max_workers=n_workers) as executor:
+        futures = {
+            executor.submit(_download_single_tile, image, tile, band_name, default_value): i
+            for i, tile in enumerate(tiles)
+        }
+        
+        for future in as_completed(futures):
+            completed += 1
+            arr, coords = future.result()
+            if arr is not None:
+                tile_arrays.append(arr)
+                tile_coords.append(coords)
+            
+            if completed % 50 == 0 or completed == len(tiles):
+                logger.info(f"  Downloaded {completed}/{len(tiles)} tiles ({len(tile_arrays)} successful)")
+    
+    if not tile_arrays:
+        raise ValueError(f"All tiles failed for {description}")
+    
+    # Calculate output dimensions
+    lat_range = max_lat - min_lat
+    lon_range = max_lon - min_lon
+    scale_deg = scale / 111320
+    out_rows = int(np.ceil(lat_range / scale_deg))
+    out_cols = int(np.ceil(lon_range / scale_deg))
+    
+    # Create output array
+    output = np.full((out_rows, out_cols), np.nan, dtype=np.float32)
+    
+    # Place tiles
+    for arr, coords in zip(tile_arrays, tile_coords):
+        tile_min_lon = min(c[0] for c in coords)
+        tile_max_lat = max(c[1] for c in coords)
+        
+        col_start = int((tile_min_lon - min_lon) / scale_deg)
+        row_start = int((max_lat - tile_max_lat) / scale_deg)
+        
+        rows = min(arr.shape[0], out_rows - row_start)
+        cols = min(arr.shape[1], out_cols - col_start)
+        
+        if rows > 0 and cols > 0:
+            output[row_start:row_start+rows, col_start:col_start+cols] = arr[:rows, :cols]
+    
+    # Fill NaN with default
+    output = np.nan_to_num(output, nan=default_value)
+    
+    logger.info(f"Mosaicked {len(tile_arrays)} tiles for {description}")
+    return output
+
+
+def calculate_irrmapper_methods():
+    """
+    Calculate effective precipitation using all methods from IrrMapper-masked rasters.
+    
+    Loads the precipitation, AWC, and ETo data and calculates Peff for each
+    of the 7 methods (excluding SuET).
+    """
+    import rioxarray
+    import numpy as np
+    import xarray as xr
+    from pycropwat.methods import (
+        cropwat_effective_precip,
+        fao_aglw_effective_precip,
+        fixed_percentage_effective_precip,
+        dependable_rainfall_effective_precip,
+        farmwest_effective_precip,
+        usda_scs_effective_precip,
+        ensemble_effective_precip
+    )
+    from scipy.ndimage import zoom
+    
+    logger.info("Calculating 7 Peff methods from IrrMapper-masked rasters...")
+    
+    # Load AWC data (static)
+    awc_file = IRRMAPPER_INPUT_DIR / 'awc.tif'
+    if not awc_file.exists():
+        logger.error(f"AWC file not found: {awc_file}")
+        logger.error("Run download_prism_with_irrmapper_mask() first")
+        return
+    
+    da_awc = rioxarray.open_rasterio(awc_file).squeeze('band', drop=True)
+    awc_data = da_awc.values
+    logger.info(f"Loaded AWC data: shape={awc_data.shape}, mean={np.nanmean(awc_data):.4f}")
+    
+    # Process each month
+    for year in range(START_YEAR, END_YEAR + 1):
+        for month in range(1, 13):
+            precip_file = IRRMAPPER_DIR / f'precip_{year}_{month:02d}.tif'
+            eto_file = IRRMAPPER_INPUT_DIR / f'eto_{year}_{month:02d}.tif'
+            
+            if not precip_file.exists():
+                continue
+            
+            # Load precipitation
+            da_precip = rioxarray.open_rasterio(precip_file).squeeze('band', drop=True)
+            precip = da_precip.values
+            
+            # Load ETo
+            if eto_file.exists():
+                da_eto = rioxarray.open_rasterio(eto_file).squeeze('band', drop=True)
+                eto_data = da_eto.values
+                # Resample ETo if shapes don't match
+                if eto_data.shape != precip.shape:
+                    zoom_factors = (precip.shape[0] / eto_data.shape[0],
+                                   precip.shape[1] / eto_data.shape[1])
+                    eto_data = zoom(eto_data, zoom_factors, order=1)
+            else:
+                logger.warning(f"ETo file not found for {year}-{month:02d}, using default 160 mm")
+                eto_data = np.full_like(precip, 160.0)
+            
+            # Resample AWC if needed
+            awc_resampled = awc_data
+            if awc_data.shape != precip.shape:
+                zoom_factors = (precip.shape[0] / awc_data.shape[0],
+                               precip.shape[1] / awc_data.shape[1])
+                awc_resampled = zoom(awc_data, zoom_factors, order=1)
+            
+            # Calculate Peff for each method (7 methods, excluding SuET)
+            method_results = {
+                'cropwat': cropwat_effective_precip(precip),
+                'fao_aglw': fao_aglw_effective_precip(precip),
+                'fixed_percentage': fixed_percentage_effective_precip(precip, 0.7),
+                'dependable_rainfall': dependable_rainfall_effective_precip(precip, 0.75),
+                'farmwest': farmwest_effective_precip(precip),
+                'usda_scs': usda_scs_effective_precip(precip, eto_data, awc_resampled, ROOTING_DEPTH),
+                'ensemble': ensemble_effective_precip(precip, eto_data, awc_resampled, ROOTING_DEPTH, 0.7, 0.75)
+            }
+            
+            # Save each method's output
+            for method_name, peff_values in method_results.items():
+                method_dir = IRRMAPPER_ANALYSIS_DIR / 'peff_by_method' / method_name
+                method_dir.mkdir(parents=True, exist_ok=True)
+                
+                output_file = method_dir / f'effective_precip_{year}_{month:02d}.tif'
+                
+                # Create DataArray with same coordinates as template
+                da_result = da_precip.copy(data=peff_values)
+                da_result = da_result.where(~np.isnan(da_precip.values))
+                
+                da_result.attrs = {
+                    'units': 'mm',
+                    'long_name': f'effective_precipitation_{method_name}',
+                    'method': method_name,
+                    'year': year,
+                    'month': month
+                }
+                da_result = da_result.rio.write_crs("EPSG:4326")
+                da_result.rio.to_raster(output_file)
+            
+            if month == 1:
+                logger.info(f"  Processed {year}...")
+    
+    logger.info("Completed Peff calculation for all 7 methods")
+
+
+def compare_irrmapper_methods():
+    """
+    Compare all effective precipitation methods for IrrMapper-masked data.
+    
+    Creates comparison visualizations including:
+    1. Side-by-side maps for a sample month (7 methods + CV)
+    2. Annual time series comparison
+    3. Statistical summary
+    """
+    import matplotlib.pyplot as plt
+    import rioxarray
+    import numpy as np
+    import pandas as pd
+    import xarray as xr
+    import json
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+    
+    logger.info("Comparing 7 Peff methods (IrrMapper masked)...")
+    
+    # Load NM boundary for overlay
+    with open(STUDY_AREA_GEOJSON, 'r') as f:
+        nm_geojson = json.load(f)
+    
+    # Extract boundary coordinates
+    nm_coords = []
+    if nm_geojson['type'] == 'FeatureCollection':
+        for feature in nm_geojson['features']:
+            geom = feature['geometry']
+            if geom['type'] == 'Polygon':
+                nm_coords.append(geom['coordinates'][0])
+            elif geom['type'] == 'MultiPolygon':
+                for poly in geom['coordinates']:
+                    nm_coords.append(poly[0])
+    elif nm_geojson['type'] == 'Feature':
+        geom = nm_geojson['geometry']
+        if geom['type'] == 'Polygon':
+            nm_coords.append(geom['coordinates'][0])
+        elif geom['type'] == 'MultiPolygon':
+            for poly in geom['coordinates']:
+                nm_coords.append(poly[0])
+    
+    # Create method comparison directory
+    IRRMAPPER_METHOD_COMPARISON_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Find all years with actual data
+    years_with_data = []
+    for year in range(START_YEAR, END_YEAR + 1):
+        test_method = IRRMAPPER_METHODS[0]
+        test_dir = IRRMAPPER_ANALYSIS_DIR / 'peff_by_method' / test_method
+        test_file = test_dir / f'effective_precip_{year}_01.tif'
+        if test_file.exists():
+            years_with_data.append(year)
+    
+    if not years_with_data:
+        logger.warning("No IrrMapper data found. Run download_prism_with_irrmapper_mask() and calculate_irrmapper_methods() first.")
+        return
+    
+    logger.info(f"Computing mean annual maps across {len(years_with_data)} years ({years_with_data[0]}-{years_with_data[-1]})")
+    
+    # Load all method data - compute mean annual across all years
+    all_data = {}
+    
+    for method_name in IRRMAPPER_METHODS:
+        input_dir = IRRMAPPER_ANALYSIS_DIR / 'peff_by_method' / method_name
+        annual_sums = []  # List of annual sums for each year
+        
+        for year in years_with_data:
+            annual_sum = None
+            months_found = 0
+            
+            for month in range(1, 13):
+                peff_file = input_dir / f'effective_precip_{year}_{month:02d}.tif'
+                
+                if peff_file.exists():
+                    da = rioxarray.open_rasterio(peff_file).squeeze('band', drop=True)
+                    if annual_sum is None:
+                        annual_sum = da.copy()
+                        annual_sum.values = np.nan_to_num(da.values, nan=0)
+                    else:
+                        annual_sum.values += np.nan_to_num(da.values, nan=0)
+                    months_found += 1
+            
+            if annual_sum is not None and months_found == 12:  # Only include complete years
+                annual_sums.append(annual_sum)
+        
+        if annual_sums:
+            # Stack and compute mean across years
+            stacked = xr.concat(annual_sums, dim='year')
+            mean_annual = stacked.mean(dim='year')
+            mean_annual = mean_annual.where(mean_annual != 0)
+            all_data[method_name] = mean_annual
+            logger.info(f"  {method_name}: computed mean across {len(annual_sums)} years")
+    
+    if not all_data:
+        logger.warning("No IrrMapper data found. Run download_prism_with_irrmapper_mask() and calculate_irrmapper_methods() first.")
+        return
+    
+    # Create comparison figure (2x4 = 8 panels: 7 methods + CV)
+    fig, axes = plt.subplots(2, 4, figsize=(24, 12))
+    axes = axes.flatten()
+    
+    # Get common color scale for method maps (exclude ensemble for CV calculation)
+    methods_for_cv = [m for m in IRRMAPPER_METHODS if m != 'ensemble']
+    vmin, vmax = float('inf'), float('-inf')
+    for method_name, da in all_data.items():
+        valid_data = da.values[~np.isnan(da.values)]
+        if len(valid_data) > 0:
+            vmin = min(vmin, np.nanpercentile(valid_data, 2))
+            vmax = max(vmax, np.nanpercentile(valid_data, 98))
+    
+    # Plot first 7 methods
+    im = None
+    for idx, method_name in enumerate(IRRMAPPER_METHODS):
+        if method_name not in all_data:
+            continue
+        if idx >= 7:  # Reserve last panel for CV
+            break
+        
+        ax = axes[idx]
+        da = all_data[method_name]
+        method_config = PEFF_METHODS[method_name]
+        
+        im = da.plot(
+            ax=ax,
+            cmap='YlGnBu',
+            vmin=vmin,
+            vmax=vmax,
+            add_colorbar=False
+        )
+        
+        # Add NM boundary
+        for coords in nm_coords:
+            xs = [c[0] for c in coords]
+            ys = [c[1] for c in coords]
+            ax.plot(xs, ys, 'k-', linewidth=1.0, alpha=0.8)
+        
+        mean_val = np.nanmean(da.values)
+        std_val = np.nanstd(da.values)
+        ax.set_title(f"{method_config['name']}\nMean: {mean_val:.1f} ± {std_val:.1f} mm", 
+                    fontsize=16, fontweight='bold')
+        ax.set_xlabel('Longitude [°]', fontsize=16)
+        ax.set_ylabel('Latitude [°]', fontsize=16)
+        ax.tick_params(axis='both', labelsize=16)
+    
+    # 8th panel: Coefficient of Variation (CV) across methods (excluding ensemble)
+    ax_cv = axes[7]
+    
+    # Stack method data for CV calculation (exclude ensemble)
+    cv_data_list = [all_data[m] for m in methods_for_cv if m in all_data]
+    if len(cv_data_list) >= 2:
+        cv_stack = xr.concat(cv_data_list, dim='method')
+        method_mean = cv_stack.mean(dim='method')
+        method_std = cv_stack.std(dim='method')
+        cv = (method_std / method_mean) * 100  # CV in percent
+        cv = cv.where(method_mean > 0)  # Mask where mean is 0
+        
+        # Plot CV with different colormap
+        cv_valid = cv.values[~np.isnan(cv.values)]
+        cv_vmax = np.nanpercentile(cv_valid, 98) if len(cv_valid) > 0 else 50
+        im_cv = cv.plot(
+            ax=ax_cv,
+            cmap='YlOrRd',
+            vmin=0,
+            vmax=cv_vmax,
+            add_colorbar=False
+        )
+        
+        # Add NM boundary to CV panel
+        for coords in nm_coords:
+            xs = [c[0] for c in coords]
+            ys = [c[1] for c in coords]
+            ax_cv.plot(xs, ys, 'k-', linewidth=1.0, alpha=0.8)
+        
+        cv_mean = np.nanmean(cv.values)
+        cv_std = np.nanstd(cv.values)
+        ax_cv.set_title(f"Coefficient of Variation\nCV: {cv_mean:.1f} ± {cv_std:.1f} %", 
+                       fontsize=16, fontweight='bold')
+        ax_cv.set_xlabel('Longitude [°]', fontsize=16)
+        ax_cv.set_ylabel('Latitude [°]', fontsize=16)
+        ax_cv.tick_params(axis='both', labelsize=16)
+        
+        # Add CV colorbar below the CV panel
+        divider = make_axes_locatable(ax_cv)
+        cax_cv = divider.append_axes("bottom", size="5%", pad=0.6)
+        cbar_cv = fig.colorbar(im_cv, cax=cax_cv, orientation='horizontal')
+        cbar_cv.set_label('CV [%]', fontsize=16)
+        cbar_cv.ax.tick_params(labelsize=16)
+    else:
+        ax_cv.set_visible(False)
+    
+    plt.suptitle(
+        f'Mean Annual Effective Precipitation - Method Comparison (IrrMapper Masked)\n'
+        f'New Mexico, {years_with_data[0]}-{years_with_data[-1]} ({len(years_with_data)} years)',
+        fontsize=16, fontweight='bold'
+    )
+    
+    plt.tight_layout()
+    fig.subplots_adjust(right=0.88)
+    cbar_ax = fig.add_axes([0.90, 0.15, 0.02, 0.7])
+    cbar = fig.colorbar(im, cax=cbar_ax)
+    cbar.set_label('Effective Precipitation [mm]', fontsize=16)
+    cbar.ax.tick_params(labelsize=16)
+    
+    output_path = IRRMAPPER_METHOD_COMPARISON_DIR / f'mean_annual_method_comparison_{years_with_data[0]}_{years_with_data[-1]}.png'
+    plt.savefig(output_path, dpi=600, bbox_inches='tight')
+    plt.close()
+    logger.info(f"Saved mean annual method comparison with CV: {output_path}")
+    
+    # Compute and plot annual totals comparison
+    logger.info("Computing annual totals...")
+    annual_totals = {method: [] for method in IRRMAPPER_METHODS}
+    years_with_data = []
+    
+    for year in range(START_YEAR, END_YEAR + 1):
+        year_data = {}
+        has_data = False
+        
+        for method_name in IRRMAPPER_METHODS:
+            annual_sum = None
+            for month in range(1, 13):
+                input_dir = IRRMAPPER_ANALYSIS_DIR / 'peff_by_method' / method_name
+                peff_file = input_dir / f'effective_precip_{year}_{month:02d}.tif'
+                
+                if peff_file.exists():
+                    da = rioxarray.open_rasterio(peff_file).squeeze('band', drop=True)
+                    if annual_sum is None:
+                        annual_sum = da.values.copy()
+                    else:
+                        annual_sum += np.nan_to_num(da.values, nan=0)
+            
+            if annual_sum is not None:
+                valid_sum = annual_sum[annual_sum > 0]
+                if len(valid_sum) > 0:
+                    year_data[method_name] = np.nanmean(valid_sum)
+                    has_data = True
+        
+        if has_data:
+            years_with_data.append(year)
+            for method_name in IRRMAPPER_METHODS:
+                if method_name in year_data:
+                    annual_totals[method_name].append(year_data[method_name])
+                else:
+                    annual_totals[method_name].append(np.nan)
+    
+    if years_with_data:
+        # Plot annual time series
+        fig, ax = plt.subplots(figsize=(14, 6))
+        
+        for method_name in IRRMAPPER_METHODS:
+            if len(annual_totals[method_name]) > 0:
+                method_config = PEFF_METHODS[method_name]
+                ax.plot(years_with_data, annual_totals[method_name],
+                       label=method_config['name'],
+                       color=method_config['color'],
+                       linewidth=2, marker='o', markersize=4)
+        
+        ax.set_xlabel('Year', fontsize=16)
+        ax.set_ylabel('Mean Annual Effective Precipitation [mm]', fontsize=16)
+        ax.set_title('Annual Peff Time Series by Method (IrrMapper Masked)\nNew Mexico',
+                    fontsize=16, fontweight='bold')
+        ax.legend(loc='upper left', fontsize=16)
+        ax.tick_params(axis='both', labelsize=16)
+        ax.grid(True, alpha=0.3)
+        
+        output_path = IRRMAPPER_METHOD_COMPARISON_DIR / 'annual_timeseries.png'
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        logger.info(f"Saved annual time series: {output_path}")
+    
+    # Save statistics
+    stats_list = []
+    for method_name, da in all_data.items():
+        valid_data = da.values[~np.isnan(da.values)]
+        if len(valid_data) > 0:
+            stats_list.append({
+                'method': method_name,
+                'method_name': PEFF_METHODS[method_name]['name'],
+                'mean_mm': np.mean(valid_data),
+                'std_mm': np.std(valid_data),
+                'min_mm': np.min(valid_data),
+                'max_mm': np.max(valid_data),
+                'pixels': len(valid_data)
+            })
+    
+    if stats_list:
+        stats_df = pd.DataFrame(stats_list)
+        stats_csv = IRRMAPPER_METHOD_COMPARISON_DIR / f'mean_annual_method_statistics_{years_with_data[0]}_{years_with_data[-1]}.csv'
+        stats_df.to_csv(stats_csv, index=False)
+        logger.info(f"Saved statistics: {stats_csv}")
+        
+        # Print summary
+        logger.info(f"\nMean Annual Effective Precipitation Summary ({years_with_data[0]}-{years_with_data[-1]}):")
+        logger.info("-" * 50)
+        for _, row in stats_df.iterrows():
+            logger.info(f"  {row['method_name']:20s}: {row['mean_mm']:.1f} ± {row['std_mm']:.1f} mm ({row['pixels']} pixels)")
+    
+    logger.info("Completed method comparison")
+
+
+def run_irrmapper_workflow(
+    skip_processing: bool = True,
+    n_workers: int = 4,
+    start_year: int = None,
+    end_year: int = None
+):
+    """
+    Run the IrrMapper-masked workflow at native PRISM resolution.
+    
+    This workflow:
+    1. Downloads PRISM precipitation at native ~800m resolution
+    2. Applies IrrMapper mask (resampled to PRISM scale)
+    3. Downloads AWC (SSURGO) and ETo (gridMET) at native resolution
+    4. Calculates 7 Peff methods locally (excluding SuET)
+    5. Creates method comparison visualizations with CV plot
+    
+    This is much faster than the 30m workflow.
+    
+    Parameters
+    ----------
+    skip_processing : bool
+        If True, skip download if data already exists.
+    n_workers : int
+        Number of parallel workers (kept for API compatibility).
+    start_year : int, optional
+        Start year. Defaults to module START_YEAR.
+    end_year : int, optional
+        End year. Defaults to module END_YEAR.
+    """
+    logger.info("=" * 60)
+    logger.info("IrrMapper Workflow - Native Resolution Peff Comparison")
+    logger.info("=" * 60)
+    
+    # Step 1: Download PRISM with IrrMapper mask at native resolution
+    logger.info(f"\n{'=' * 40}")
+    logger.info("Step 1: Downloading PRISM with IrrMapper mask")
+    logger.info("=" * 40)
+    download_prism_with_irrmapper_mask(
+        start_year=start_year,
+        end_year=end_year,
+        skip_if_exists=skip_processing,
+        n_workers=n_workers
+    )
+    
+    # Step 2: Calculate all methods from rasters
+    logger.info(f"\n{'=' * 40}")
+    logger.info("Step 2: Calculating 7 Peff Methods")
+    logger.info("=" * 40)
+    calculate_irrmapper_methods()
+    
+    # Step 3: Compare all methods
+    logger.info(f"\n{'=' * 40}")
+    logger.info("Step 3: Comparing Methods")
+    logger.info("=" * 40)
+    compare_irrmapper_methods()
+    
+    logger.info("\n" + "=" * 60)
+    logger.info("IrrMapper Workflow Complete!")
+    logger.info("=" * 60)
+    logger.info(f"Outputs saved to:")
+    logger.info(f"  - Precipitation data: {IRRMAPPER_DIR}")
+    logger.info(f"  - Input data (AWC, ETo): {IRRMAPPER_INPUT_DIR}")
+    logger.info(f"  - Analysis outputs: {IRRMAPPER_ANALYSIS_DIR}")
+    logger.info(f"  - Method comparison: {IRRMAPPER_METHOD_COMPARISON_DIR}")
+
+
 if __name__ == '__main__':
     import argparse
     
@@ -1457,6 +2388,21 @@ if __name__ == '__main__':
         default=4,
         help='Number of parallel workers for GEE processing (default: 4)'
     )
+    parser.add_argument(
+        '--irrmapper', '-I',
+        action='store_true',
+        help='Run IrrMapper workflow at native PRISM resolution (~800m)'
+    )
+    parser.add_argument(
+        '--start-year',
+        type=int,
+        help='Start year for processing (default: 1986)'
+    )
+    parser.add_argument(
+        '--end-year',
+        type=int,
+        help='End year for processing (default: 2025)'
+    )
     
     args = parser.parse_args()
     
@@ -1465,7 +2411,14 @@ if __name__ == '__main__':
         GEE_PROJECT = args.gee_project
     
     # Run appropriate workflow
-    if args.comparison_only:
+    if args.irrmapper:
+        run_irrmapper_workflow(
+            skip_processing=not args.force_reprocess,
+            n_workers=args.workers,
+            start_year=args.start_year,
+            end_year=args.end_year
+        )
+    elif args.comparison_only:
         run_analysis_only(comparison_only=True)
     elif args.analysis_only:
         run_analysis_only()
