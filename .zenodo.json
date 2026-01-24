@@ -5,42 +5,50 @@
         {
             "name": "Majumdar, Sayantan",
             "affiliation": "Desert Research Institute",
-            "orcid": "0000-0002-3539-0147"
+            "orcid": "0000-0002-3539-0147",
+            "type": "ContactPerson"
         },
         {
             "name": "ReVelle, Peter",
             "affiliation": "Desert Research Institute",
-            "orcid": "0000-0001-8266-3753"
+            "orcid": "0000-0001-8266-3753",
+            "type": "Researcher"
         },
         {
             "name": "Pearson, Christopher",
             "affiliation": "Desert Research Institute",
-            "orcid": "0000-0003-2090-0770"
+            "orcid": "0000-0003-2090-0770",
+            "type": "Researcher"
         },
         {
             "name": "Nozari, Soheil",
             "affiliation": "Colorado State University",
-            "orcid": "0000-0002-0098-5837"
+            "orcid": "0000-0002-0098-5837",
+            "type": "Researcher"
         },
         {
             "name": "Minor, Blake A.",
             "affiliation": "Desert Research Institute",
-            "orcid": "0000-0001-8676-7592"
+            "orcid": "0000-0001-8676-7592",
+            "type": "Researcher"
         },
         {
             "name": "Hasan, M. F.",
             "affiliation": "Colorado State University",
-            "orcid": "0000-0002-9520-983X"
+            "orcid": "0000-0002-9520-983X",
+            "type": "DataCurator"
         },
         {
             "name": "Huntington, Justin L.",
             "affiliation": "Desert Research Institute",
-            "orcid": "0009-0008-2006-2969"
+            "orcid": "0009-0008-2006-2969",
+            "type": "Supervisor"
         },
         {
             "name": "Smith, Ryan G.",
             "affiliation": "Colorado State University",
-            "orcid": "0000-0002-3747-6868"
+            "orcid": "0000-0002-3747-6868",
+            "type": "Supervisor"
         }
     ],
     "keywords": [
