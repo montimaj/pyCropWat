@@ -13,6 +13,8 @@ The module supports multiple effective precipitation methods:
 - **Dependable Rainfall**: FAO Dependable Rainfall method
 - **FarmWest**: FarmWest method
 - **USDA-SCS**: Soil moisture depletion method (requires AWC and ETo)
+- **TAGEM-SuET**: Turkish irrigation method (requires ETo)
+- **PCML**: Physics-Constrained ML for Western U.S. (pre-computed GEE asset)
 
 Example
 -------
@@ -58,6 +60,47 @@ logger = logging.getLogger(__name__)
 
 # Maximum pixels per tile for GEE sampleRectangle (conservative limit)
 MAX_PIXELS_PER_TILE = 65536  # 256 x 256
+
+# PCML (Physics-Constrained Machine Learning) default settings for Western U.S.
+PCML_DEFAULT_ASSET = 'projects/ee-peff-westus-unmasked/assets/effective_precip_monthly_unmasked'
+PCML_DEFAULT_BAND = 'pcml'  # Special marker - actual bands are bYYYY_M format (e.g., b2015_9, b2016_10)
+PCML_DEFAULT_SCALE = None  # Retrieved dynamically from asset using nominalScale()
+
+# Western U.S. bounding box (17 states: AZ, CA, CO, ID, KS, MT, NE, NV, NM, ND, OK, OR, SD, TX, UT, WA, WY)
+# The PCML image geometry is not bounded in the asset, so we use a predefined extent
+# Note: Only Western U.S. vectors overlapping the 17-state extent can be used with PCML
+PCML_WESTERN_US_BOUNDS = [
+    [-125.0, 49.5],   # Northwest corner
+    [-93.0, 49.5],    # Northeast corner
+    [-93.0, 25.5],    # Southeast corner
+    [-125.0, 25.5],   # Southwest corner
+    [-125.0, 49.5]    # Close polygon
+]
+
+# PCML annual fraction asset (effective_precip / total_precip, available WY 2000-2024)
+# Note: Only annual (water year, Oct-Sep) fractions are available for PCML, not monthly. Band format: bYYYY
+PCML_FRACTION_ASSET = 'projects/ee-peff-westus-unmasked/assets/effective_precip_fraction_unmasked'
+
+
+def get_pcml_band_name(year: int, month: int) -> str:
+    """Get PCML band name for a specific year and month.
+    
+    PCML bands are formatted as bYYYY_M where months 1-9 do not have a preceding zero.
+    Examples: b2015_9, b2016_10
+    
+    Parameters
+    ----------
+    year : int
+        Year (e.g., 2015)
+    month : int
+        Month (1-12)
+        
+    Returns
+    -------
+    str
+        Band name in format bYYYY_M
+    """
+    return f"b{year}_{month}"
 
 
 class EffectivePrecipitation:
@@ -132,6 +175,8 @@ class EffectivePrecipitation:
           (requires AWC and ETo data via method_params)
         - ``'suet'`` - TAGEM-SuET method (Turkish Irrigation Management System)
           (requires ETo data via method_params)
+        - ``'pcml'`` - Physics-Constrained ML (Western U.S. only, Jan 2000 - Sep 2024)
+          Uses default GEE asset: projects/ee-peff-westus-unmasked/assets/effective_precip_monthly_unmasked
           
     method_params : dict, optional
         Additional parameters for the selected method:
@@ -156,6 +201,8 @@ class EffectivePrecipitation:
               Set True for AgERA5 daily data.
             - ``eto_scale_factor`` (float): Scale factor for ETo. Default 1.0.
             - ``rooting_depth`` (float): Rooting depth in meters. Default 1.0.
+            - ``mad_factor`` (float): Management Allowed Depletion factor (0-1).
+              Controls what fraction of soil water storage is available. Default 0.5.
         
     Attributes
     ----------
@@ -289,41 +336,75 @@ class EffectivePrecipitation:
         # Input directory for saving downloaded data (set during process())
         self._input_dir = None
         
-        # Validate that at least one geometry source is provided
-        if geometry_path is None and gee_geometry_asset is None:
+        # Check if this is PCML method (uses single multi-band Image instead of ImageCollection)
+        self._is_pcml = (method == 'pcml' or self.precip_band == PCML_DEFAULT_BAND)
+        
+        # For PCML, use default asset if placeholder provided
+        if self._is_pcml:
+            if self.asset_id == 'PLACEHOLDER' or self.asset_id is None:
+                self.asset_id = PCML_DEFAULT_ASSET
+                logger.info(f"Using default PCML asset: {self.asset_id}")
+            self.precip_band = PCML_DEFAULT_BAND
+        
+        # Validate that at least one geometry source is provided (not required for PCML)
+        if geometry_path is None and gee_geometry_asset is None and not self._is_pcml:
             raise ValueError("Either geometry_path or gee_geometry_asset must be provided")
         
         # Initialize GEE
         initialize_gee(self.gee_project)
         
-        # Load geometry from GEE asset or local file
-        self.geometry = load_geometry(geometry_path, gee_asset=gee_geometry_asset)
-        self.bounds = self.geometry.bounds().getInfo()['coordinates'][0]
+        # For PCML, use the asset's own geometry if no geometry provided
+        if self._is_pcml and geometry_path is None and gee_geometry_asset is None:
+            # Load PCML image first
+            self._pcml_image = ee.Image(self.asset_id)
+            # Use predefined Western U.S. bounding box since PCML image geometry is unbounded
+            self.geometry = ee.Geometry.Polygon([PCML_WESTERN_US_BOUNDS])
+            self.bounds = PCML_WESTERN_US_BOUNDS
+            logger.info("Using predefined Western U.S. bounding box for PCML")
+        else:
+            # Load geometry from GEE asset or local file
+            self.geometry = load_geometry(geometry_path, gee_asset=gee_geometry_asset)
+            self.bounds = self.geometry.bounds().getInfo()['coordinates'][0]
         
         # Get date range
         self.start_date, self.end_date = get_date_range(start_year, end_year)
         
-        # Load and filter image collection
+        # Load and filter image collection (or load PCML image)
         self._load_collection()
         
     def _load_collection(self) -> None:
-        """Load and prepare the GEE ImageCollection."""
-        self.collection = (
-            ee.ImageCollection(self.asset_id)
-            .select(self.precip_band)
-            .filterDate(self.start_date, self.end_date)
-            .filterBounds(self.geometry)
-        )
-        
-        # Apply scale factor and rename band to 'pr'
-        def scale_and_rename(img):
-            return (
-                img.multiply(self.precip_scale_factor)
-                .rename('pr')
-                .copyProperties(img, ['system:time_start', 'system:time_end'])
+        """Load and prepare the GEE ImageCollection (or PCML Image)."""
+        if self._is_pcml:
+            # PCML is a single multi-band Image, not an ImageCollection
+            # Bands are named bYYYY_M (e.g., b2015_9, b2016_10)
+            # May already be loaded if geometry was derived from it
+            if not hasattr(self, '_pcml_image') or self._pcml_image is None:
+                self._pcml_image = ee.Image(self.asset_id)
+            self.collection = None  # Not used for PCML
+            
+            # Get PCML native scale from asset using nominalScale()
+            self._pcml_scale = self._pcml_image.projection().nominalScale().getInfo()
+            logger.info(f"Loaded PCML image with dynamic band selection (bYYYY_M format)")
+            logger.info(f"PCML native scale from asset: {self._pcml_scale:.2f}m")
+        else:
+            # Standard ImageCollection processing
+            self.collection = (
+                ee.ImageCollection(self.asset_id)
+                .select(self.precip_band)
+                .filterDate(self.start_date, self.end_date)
+                .filterBounds(self.geometry)
             )
-        
-        self.collection = self.collection.map(scale_and_rename)
+            
+            # Apply scale factor and rename band to 'pr'
+            def scale_and_rename(img):
+                return (
+                    img.multiply(self.precip_scale_factor)
+                    .rename('pr')
+                    .copyProperties(img, ['system:time_start', 'system:time_end'])
+                )
+            
+            self.collection = self.collection.map(scale_and_rename)
+            self._pcml_image = None
         
     @staticmethod
     def cropwat_effective_precip(pr: np.ndarray) -> np.ndarray:
@@ -358,6 +439,10 @@ class EffectivePrecipitation:
             Native scale in meters.
         """
         try:
+            # For PCML, use the pre-computed scale from the asset
+            if self._is_pcml and hasattr(self, '_pcml_scale') and self._pcml_scale is not None:
+                return self._pcml_scale
+            
             # Get the first image from the collection to determine native scale
             first_img = self.collection.first()
             projection = first_img.projection()
@@ -636,15 +721,96 @@ class EffectivePrecipitation:
         -------
         ee.Image
             Monthly precipitation image (sum of all images in that month).
+            For PCML, returns the specific band for that year/month.
         """
-        monthly_img = (
-            self.collection
-            .filter(ee.Filter.calendarRange(year, year, 'year'))
-            .filter(ee.Filter.calendarRange(month, month, 'month'))
-            .sum()  # Sum all images to get monthly total precipitation
-        )
+        if self._is_pcml:
+            # PCML: select band by name bYYYY_M (e.g., b2015_9, b2016_10)
+            band_name = get_pcml_band_name(year, month)
+            monthly_img = self._pcml_image.select([band_name]).rename('pr')
+            logger.debug(f"PCML: Selected band {band_name}")
+        else:
+            # Standard ImageCollection: filter and sum
+            monthly_img = (
+                self.collection
+                .filter(ee.Filter.calendarRange(year, year, 'year'))
+                .filter(ee.Filter.calendarRange(month, month, 'month'))
+                .sum()  # Sum all images to get monthly total precipitation
+            )
         return monthly_img.clip(self.geometry)
     
+    def _download_pcml_annual_fraction(self, year: int, template_da: xr.DataArray) -> np.ndarray:
+        """
+        Download PCML annual effective precipitation fraction from GEE asset.
+        
+        The PCML annual fraction asset contains pre-computed effective_precip / total_precip
+        ratios for each water year (Oct-Sep, 2000-2024).
+        
+        Parameters
+        ----------
+        year : int
+            Year (2000-2024).
+        template_da : xr.DataArray
+            Template DataArray to match spatial extent.
+            
+        Returns
+        -------
+        np.ndarray
+            Annual effective precipitation fraction at PCML scale.
+        """
+        logger.info(f"Loading PCML annual fraction for {year}")
+        
+        try:
+            # Load PCML annual fraction image
+            pcml_fraction_image = ee.Image(PCML_FRACTION_ASSET)
+            
+            # Select the band for this year (format: bYYYY)
+            band_name = f"b{year}"
+            fraction_img = pcml_fraction_image.select([band_name]).rename('fraction').clip(self.geometry)
+            logger.debug(f"PCML Fraction: Selected band {band_name}")
+            
+            # Use PCML native scale
+            scale_meters = self._pcml_scale
+            
+            # Reproject to PCML scale
+            fraction_img = fraction_img.reproject(
+                crs='EPSG:4326',
+                scale=scale_meters
+            )
+            
+            # Download - use chunked download for large regions
+            region = self.geometry.bounds()
+            bounds_coords = region.getInfo()['coordinates'][0]
+            
+            # Estimate pixel count
+            estimated_pixels = self._estimate_pixel_count(bounds_coords, scale_meters)
+            logger.debug(f"PCML fraction download: estimated pixels={estimated_pixels}, max={MAX_PIXELS_PER_TILE}")
+            
+            if estimated_pixels <= MAX_PIXELS_PER_TILE:
+                # Direct download (small region)
+                arr = fraction_img.sampleRectangle(
+                    region=region,
+                    defaultValue=0
+                ).get('fraction').getInfo()
+                
+                if arr is None:
+                    logger.warning(f"No PCML fraction data for {year}")
+                    return np.full(template_da.shape, 0, dtype=np.float32)
+                fraction_arr = np.array(arr, dtype=np.float32)
+            else:
+                # Chunked download for large regions
+                logger.info(f"Large region for PCML fraction ({estimated_pixels} pixels), using chunked download...")
+                fraction_arr = self._download_image_chunked(
+                    fraction_img, bounds_coords, scale_meters,
+                    band_name='fraction', default_value=0.0,
+                    target_shape=template_da.shape, data_name="PCML_fraction"
+                )
+            
+            return fraction_arr
+            
+        except Exception as e:
+            logger.warning(f"Error loading PCML annual fraction data: {e}. Returning zeros.")
+            return np.full(template_da.shape, 0, dtype=np.float32)
+
     def _download_monthly_precip(self, year: int, month: int, temp_dir: Optional[Path] = None) -> Optional[xr.DataArray]:
         """
         Download monthly precipitation data from GEE, using chunked download if needed.
@@ -1160,17 +1326,34 @@ class EffectivePrecipitation:
             return None, None
         
         # Calculate effective precipitation using the configured method
-        if self.method == 'usda_scs':
+        if self.method == 'pcml':
+            # PCML: pr_da already contains effective precipitation (PCML Peff)
+            # Download annual fraction directly from the GEE asset (once per year)
+            ep_arr = pr_da.values  # PCML Peff is directly downloaded
+            
+            # For PCML, check if annual fraction file already exists
+            pcml_frac_path = output_dir / f"effective_precip_fraction_{year}.tif"
+            if pcml_frac_path.exists():
+                # Load existing annual fraction
+                epf_da_existing = rioxarray.open_rasterio(pcml_frac_path).squeeze('band', drop=True)
+                epf_arr = epf_da_existing.values
+                logger.info(f"PCML annual fraction for {year} already exists, reusing")
+            else:
+                epf_arr = self._download_pcml_annual_fraction(year, pr_da)
+                logger.info(f"PCML annual fraction loaded from GEE asset for {year}")
+        elif self.method == 'usda_scs':
             # USDA-SCS method requires AWC and ETo data
             awc_arr = self._load_awc_data(pr_da)
             eto_arr = self._load_monthly_eto(year, month, pr_da)
             rooting_depth = self.method_params.get('rooting_depth', 1.0)
+            mad_factor = self.method_params.get('mad_factor', 0.5)
             
             ep_arr = self._peff_function(
                 pr_da.values,
                 eto_arr,
                 awc_arr,
-                rooting_depth
+                rooting_depth,
+                mad_factor
             )
         elif self.method == 'ensemble':
             # Ensemble method requires AWC and ETo data (same as USDA-SCS)
@@ -1204,9 +1387,10 @@ class EffectivePrecipitation:
         else:
             ep_arr = self._peff_function(pr_da.values)
         
-        # Calculate effective precipitation fraction
-        with np.errstate(divide='ignore', invalid='ignore'):
-            epf_arr = np.where(pr_da.values > 0, ep_arr / pr_da.values, 0)
+        # Calculate effective precipitation fraction (skip for PCML - already calculated above)
+        if self.method != 'pcml':
+            with np.errstate(divide='ignore', invalid='ignore'):
+                epf_arr = np.where(pr_da.values > 0, ep_arr / pr_da.values, 0)
         
         # Create effective precipitation DataArray
         ep_da = xr.DataArray(
@@ -1224,6 +1408,8 @@ class EffectivePrecipitation:
         ep_da = ep_da.rio.write_crs("EPSG:4326")
         
         # Create effective precipitation fraction DataArray
+        # For PCML: annual fraction loaded directly from GEE asset
+        # For others: fraction = peff / precip
         epf_da = xr.DataArray(
             epf_arr.astype(np.float32),
             dims=pr_da.dims,
@@ -1233,19 +1419,29 @@ class EffectivePrecipitation:
                 'long_name': 'effective_precipitation_fraction',
                 'year': year,
                 'month': month,
-                'method': self.method.upper()
+                'method': self.method.upper(),
+                'note': 'PCML annual fraction from GEE asset' if self.method == 'pcml' else 'peff / precip'
             }
         )
         epf_da = epf_da.rio.write_crs("EPSG:4326")
         
         # Save to GeoTIFF
         ep_path = output_dir / f"effective_precip_{year}_{month:02d}.tif"
-        epf_path = output_dir / f"effective_precip_fraction_{year}_{month:02d}.tif"
+        
+        # For PCML, save annual fraction only once per year (without month suffix)
+        if self.method == 'pcml':
+            epf_path = output_dir / f"effective_precip_fraction_{year}.tif"
+        else:
+            epf_path = output_dir / f"effective_precip_fraction_{year}_{month:02d}.tif"
         
         ep_da.rio.to_raster(ep_path)
-        epf_da.rio.to_raster(epf_path)
         
-        logger.info(f"Saved: {ep_path.name}, {epf_path.name}")
+        # Only save fraction file if it doesn't exist (for PCML) or always (for others)
+        if self.method != 'pcml' or not epf_path.exists():
+            epf_da.rio.to_raster(epf_path)
+            logger.info(f"Saved: {ep_path.name}, {epf_path.name}")
+        else:
+            logger.info(f"Saved: {ep_path.name} (fraction already exists)")
         
         return ep_path, epf_path
     
@@ -1300,7 +1496,8 @@ class EffectivePrecipitation:
         Output files are named:
         
         - ``effective_precip_YYYY_MM.tif`` - Effective precipitation in mm
-        - ``effective_precip_fraction_YYYY_MM.tif`` - Effective/total ratio
+        - ``effective_precip_fraction_YYYY_MM.tif`` - Effective/total ratio (non-PCML methods)
+        - ``effective_precip_fraction_YYYY.tif`` - Annual (water year) fraction (PCML method only)
         
         For the USDA-SCS method, AWC and ETo data are automatically downloaded
         and cached for efficiency.

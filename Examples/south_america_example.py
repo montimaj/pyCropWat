@@ -28,7 +28,7 @@ Study Area:
 - Rio de la Plata Basin (projects/ssebop-471916/assets/Riodelaplata)
 
 Effective Precipitation Methods Compared (8 total):
-- Ensemble - Mean of 6 methods (default, excludes TAGEM-SuET)
+- Ensemble - Mean of 6 methods (default, excludes TAGEM-SuET and PCML)
 - CROPWAT - Method from FAO CROPWAT
 - FAO/AGLW - FAO Dependable Rainfall (80% exceedance)
 - Fixed Percentage (70%) - Simple empirical method

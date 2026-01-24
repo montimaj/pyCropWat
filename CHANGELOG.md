@@ -2,6 +2,37 @@
 
 All notable changes to pyCropWat will be documented in this file.
 
+## [1.2] - 2026-01-23
+
+### ✨ New Features
+- **PCML Method**: Added Physics-Constrained Machine Learning (PCML) effective precipitation method for Western U.S.
+  - Pre-computed Peff from GEE asset: `projects/ee-peff-westus-unmasked/assets/effective_precip_monthly_unmasked`
+  - Coverage: 17 Western U.S. states (AZ, CA, CO, ID, KS, MT, NE, NV, NM, ND, OK, OR, SD, TX, UT, WA, WY)
+  - Temporal: January 2000 - September 2024 (monthly)
+  - Resolution: ~2 km (native scale retrieved dynamically from GEE asset)
+  - Band format: `bYYYY_M` (e.g., `b2015_9` for September 2015)
+  - Annual (water year, Oct-Sep) fractions from separate GEE asset
+  - CLI: `pycropwat process --method pcml --start-year 2000 --end-year 2024 --output ./output`
+  - Reference: [Hasan et al. (2025)](https://doi.org/10.1016/j.agwat.2025.109821)
+- **Simplified PCML CLI**: PCML method no longer requires `--asset`, `--band`, or `--geometry` arguments
+  - Default asset and band are automatically set when `--method pcml` is used
+  - Geometry defaults to full Western U.S. extent (17 states)
+  - User can optionally provide geometry to subset the region
+- **UCRB Field-Scale Example**: Added new Upper Colorado River Basin example for field-scale Peff calculations
+  - Uses existing precipitation volumes from GeoPackage
+  - Demonstrates AWC lookup from CSV and all 8 Peff methods
+
+### 📁 New Files
+- `Examples/western_us_pcml_example.py` - Western U.S. PCML workflow with water year aggregation
+- `Examples/ucrb_example.py` - UCRB field-scale Peff calculation example
+
+### 📚 Documentation
+- Updated all PCML documentation to clarify that only Western U.S. vectors overlapping the 17-state extent can be used
+- Added PCML CLI examples to help text and docstrings
+- Synchronized badges between README.md and docs/index.md
+
+---
+
 ## [1.1.1.post3] - 2026-01-12
 
 ### 📚 Documentation
@@ -28,7 +59,7 @@ All notable changes to pyCropWat will be documented in this file.
 ## [1.1.0] - 2026-01-11
 
 ### ✨ New Features
-- **Ensemble Method**: Added new robust effective precipitation method that calculates the mean of 6 methods (excludes TAGEM-SuET)
+- **Ensemble Method**: Added new robust effective precipitation method that calculates the mean of 6 methods (excludes TAGEM-SuET and PCML)
   - Formula: Peff_ensemble = (CROPWAT + FAO/AGLW + Fixed 70% + Dependable 75% + FarmWest + USDA-SCS) / 6
   - Requires AWC and ETo data (same as USDA-SCS) via `--awc-asset` and `--eto-asset` CLI flags
   - Recommended for robust multi-method estimates that reduce bias from any single method
@@ -213,9 +244,9 @@ All notable changes to pyCropWat will be documented in this file.
 ### 📁 New Files
 - `pycropwat/methods.py` - Effective precipitation calculation methods
 - `pycropwat/analysis.py` - Temporal aggregation, statistics, visualization
-- `Examples/arizona_example.py` - Arizona workflow (all 8 methods)
-- `Examples/south_america_example.py` - Rio de la Plata workflow (all 8 methods)
-- `Examples/new_mexico_example.py` - New Mexico workflow (all 8 methods)
+- `Examples/arizona_example.py` - Arizona workflow (8 methods, excludes PCML)
+- `Examples/south_america_example.py` - Rio de la Plata workflow (8 methods, excludes PCML)
+- `Examples/new_mexico_example.py` - New Mexico workflow (8 methods, excludes PCML)
 
 ### 🚀 Quick Start
 

@@ -66,6 +66,7 @@ pycropwat process [OPTIONS]
 | `--eto-band` | eto | ETo band name |
 | `--eto-is-daily` | False | Set if ETo asset is daily (aggregates to monthly) |
 | `--rooting-depth` | 1.0 | Crop rooting depth in meters for usda_scs |
+| `--mad-factor` | 0.5 | Management Allowed Depletion factor (0-1) for usda_scs |
 | `--sequential` | False | Process sequentially instead of parallel |
 
 ### Available Methods
@@ -79,7 +80,8 @@ pycropwat process [OPTIONS]
 | `farmwest` | FarmWest method: Peff = (P - 5) × 0.75 |
 | `usda_scs` | USDA-SCS with AWC and ETo (requires additional assets) |
 | `suet` | TAGEM-SuET method: P - ETo with 75mm threshold (requires ETo asset) |
-| `ensemble` | Mean of 6 methods - default (excludes TAGEM-SuET; requires AWC and ETo) |
+| `pcml` | Physics-Constrained ML (Western U.S. only, uses default GEE asset) |
+| `ensemble` | Mean of 6 methods - default (excludes TAGEM-SuET and PCML; requires AWC and ETo) |
 
 ### Examples
 
@@ -156,7 +158,7 @@ pycropwat process \
     --method usda_scs \
     --awc-asset projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite \
     --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \
-    --rooting-depth 1.0 \
+    --rooting-depth 1.0 --mad-factor 0.5 \
     --output ./output_usda_scs
 ```
 
@@ -178,8 +180,43 @@ pycropwat process \
     --eto-asset projects/climate-engine-pro/assets/ce-ag-era5-v2/daily \
     --eto-band ReferenceET_PenmanMonteith_FAO56 \
     --eto-is-daily \
-    --rooting-depth 1.0 \
+    --rooting-depth 1.0 --mad-factor 0.5 \
     --output ./output_usda_scs_global
+```
+
+#### PCML Method (Western U.S. Only)
+
+The Physics-Constrained Machine Learning (PCML) method uses a pre-computed GEE asset covering the Western United States. **No geometry is required** - the PCML asset's built-in geometry automatically covers the 17 western states.
+
+```bash
+# PCML for Western U.S. - no geometry needed
+pycropwat process \
+    --start-year 2015 --end-year 2020 \
+    --method pcml \
+    --output ./output_pcml
+```
+
+**PCML Method Details:**
+
+| Attribute | Value |
+|-----------|-------|
+| **Coverage** | Western U.S. (17 states) |
+| **Temporal** | January 2000 - September 2024 |
+| **Resolution** | ~2 km (retrieved dynamically from asset) |
+| **Outputs** | PCML Peff + annual (water year, Oct-Sep) fraction rasters (from GEE asset, band format: `bYYYY`) |
+
+**PCML Geometry Options:**
+
+- **No geometry provided**: Downloads the entire PCML asset (full Western U.S. - 17 states)
+- **User provides geometry**: PCML data is clipped/subsetted to that geometry (e.g., just Pacific Northwest states), reducing download size and processing time
+
+```bash
+# PCML for a specific region (e.g., Pacific Northwest)
+pycropwat process \
+    --geometry pacific_northwest.geojson \
+    --start-year 2015 --end-year 2020 \
+    --method pcml \
+    --output ./output_pcml_pnw
 ```
 
 ---

@@ -16,7 +16,7 @@ IrrMapper Workflow (Native Resolution ~800m):
 The script also includes an IrrMapper workflow that:
 1. Applies the IrrMapper irrigated lands mask at native PRISM resolution (~800m)
 2. Downloads precipitation, AWC (SSURGO), and ETo (gridMET) with mask
-3. Calculates 7 effective precipitation methods (excluding SuET)
+3. Calculates 8 effective precipitation methods (excluding PCML)
 4. Compares methods within irrigated areas only with CV visualization
 
 This approach is efficient as it works at native PRISM resolution.
@@ -31,14 +31,15 @@ USDA-SCS Required Data (US):
 IrrMapper Dataset:
 - IrrMapper (UMT/Climate/IrrMapper_RF/v1_2) - 30m binary mask, resampled to PRISM scale
 
-Effective Precipitation Methods Compared (7 methods):
-- Ensemble - Mean of 6 methods (excludes SuET)
+Effective Precipitation Methods Compared (8 methods):
 - CROPWAT - Method from FAO CROPWAT
 - FAO/AGLW - FAO Dependable Rainfall (80% exceedance)
 - Fixed Percentage (70%) - Simple empirical method
 - Dependable Rainfall (80% probability) - Statistical approach
 - FarmWest - WSU irrigation scheduling formula
 - USDA-SCS - Site-specific method with AWC and ETo (SSURGO + gridMET)
+- TAGEM-SuET - Turkish Irrigation Management System (P - ETo)
+- Ensemble - Mean of 6 methods (default, excludes TAGEM-SuET and PCML)
 
 Study Area:
 - New Mexico (NM.geojson)
@@ -162,7 +163,7 @@ PEFF_METHODS = {
     'ensemble': {
         'name': 'Ensemble',
         'color': '#17becf',
-        'description': 'Mean of 6 methods (excludes TAGEM-SuET)',
+        'description': 'Mean of 6 methods (excludes TAGEM-SuET and PCML)',
         'params': {
             'awc_asset': AWC_ASSET,
             'awc_band': AWC_BAND,
@@ -1327,7 +1328,7 @@ def run_full_workflow(skip_processing: bool = True, n_workers: int = 4):
     
     This workflow:
     1. Downloads precipitation, AWC, and ETo rasters using USDA-SCS method
-    2. Calculates all 8 Peff methods locally from saved rasters
+    2. Calculates 8 Peff methods locally from saved rasters (PCML requires separate GEE asset)
     3. Performs temporal aggregation and statistical analysis
     4. Creates comparison visualizations
     

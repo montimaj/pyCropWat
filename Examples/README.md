@@ -6,13 +6,214 @@ This directory contains comprehensive example scripts demonstrating the full cap
 
 | Script | Region | Method | Precipitation Data | Comparisons |
 |--------|--------|--------|-------------------|-------------|
-| `south_america_example.py` | Rio de la Plata (South America) | All 8 methods | ERA5-Land, TerraClimate | Method comparison |
-| `arizona_example.py` | Arizona (U.S.) | All 8 methods | GridMET, PRISM, ERA5-Land, TerraClimate | U.S. vs Global, Method comparison |
-| `new_mexico_example.py` | New Mexico (U.S.) | All 8 methods | PRISM | Method comparison |
+| `south_america_example.py` | Rio de la Plata (South America) | 8 methods | ERA5-Land, TerraClimate | Method comparison |
+| `arizona_example.py` | Arizona (U.S.) | 8 methods | GridMET, PRISM, ERA5-Land, TerraClimate | U.S. vs Global, Method comparison |
+| `new_mexico_example.py` | New Mexico (U.S.) | 8 methods | PRISM | Method comparison |
+| `western_us_pcml_example.py` | Western U.S. (17 states) | PCML | PCML GEE Asset | Water year totals, Mean fractions |
+| `ucrb_example.py` | Upper Colorado River Basin | 8 methods | GeoPackage (pre-existing) | Field-scale aggregation |
 
 ---
 
-## 1. Rio de la Plata Example (Global)
+## 1. Western U.S. PCML Example
+
+### Overview
+
+The `western_us_pcml_example.py` script demonstrates the Physics-Constrained Machine Learning (PCML) method for effective precipitation estimation in the Western United States. This example downloads pre-computed PCML Peff values and calculates water year totals.
+
+### Study Area
+
+**Western United States** - 17 states: AZ, CA, CO, ID, KS, MT, NE, NV, NM, ND, OK, OR, SD, TX, UT, WA, WY
+
+### PCML Method
+
+| Attribute | Value |
+|-----------|-------|
+| **GEE Asset** | `projects/ee-peff-westus-unmasked/assets/effective_precip_monthly_unmasked` |
+| **Temporal** | January 2000 - September 2024 (monthly) |
+| **Resolution** | ~2 km (native scale retrieved dynamically from GEE asset) |
+| **Band Format** | `bYYYY_M` (e.g., `b2015_9`, `b2016_10`) |
+| **Fraction Calculation** | Annual (water year, Oct-Sep) fractions only from GEE asset (WY 2000-2024, band format: `bYYYY`) |
+
+### PCML Geometry Options
+
+- **No geometry provided**: Downloads the entire PCML asset (full Western U.S. - 17 states)
+- **User provides geometry**: PCML data is clipped/subsetted to that geometry. **Note:** Only Western U.S. vectors that overlap with the 17-state extent can be used (e.g., AZ.geojson, pacific_northwest.geojson)
+
+### Water Year Definition
+
+- Western U.S. water year runs from **October to September**
+- Water Year 2001 = October 2000 - September 2001
+- Water Year 2024 = October 2023 - September 2024
+
+### Workflow Steps
+
+1. **Download PCML Data** - Downloads monthly PCML Peff and annual fractions from GEE assets
+2. **Calculate Water Year Totals** - Aggregates Oct-Sep totals for each water year
+3. **Calculate Mean Fractions** - Computes long-term mean Peff fractions (WY 2001-2024)
+4. **Visualization** - Creates time series, maps, and summary figures
+
+**Note:** For PCML, `save_inputs=False` is recommended since the PCML effective precipitation comes directly from the GEE asset (not calculated from raw precipitation). Setting `save_inputs=True` would save redundant copies of the data.
+
+### Outputs
+
+| Output Type | Location | Description |
+|-------------|----------|-------------|
+| Monthly Peff | `WesternUS_PCML/effective_precip_YYYY_MM.tif` | Monthly PCML effective precipitation |
+| Annual Fractions | `WesternUS_PCML/effective_precip_fraction_YYYY.tif` | Annual (water year, Oct-Sep) Peff/Precip fractions |
+| Water Year Totals | `WesternUS_PCML/water_year/pcml_peff_wy*.tif` | Oct-Sep total Peff |
+| Mean Fractions | `WesternUS_PCML/fractions/pcml_mean_fraction_*.tif` | Long-term mean fractions |
+| Figures | `WesternUS_PCML/figures/` | Time series, maps, summary plots |
+
+### Usage
+
+```bash
+# Basic usage (4 workers)
+python western_us_pcml_example.py
+
+# Use 8 workers
+python western_us_pcml_example.py -w 8
+
+# Skip download, run analysis only
+python western_us_pcml_example.py --analysis-only
+
+# Specify GEE project
+python western_us_pcml_example.py --gee-project your-project-id
+```
+
+### Reference
+
+Hasan, M. F., Smith, R. G., Majumdar, S., Huntington, J. L., Alves Meira Neto, A., & Minor, B. A. (2025). Satellite data and physics-constrained machine learning for estimating effective precipitation in the Western United States and application for monitoring groundwater irrigation. *Agricultural Water Management*, 319, 109821. https://doi.org/10.1016/j.agwat.2025.109821
+
+---
+
+## 2. Upper Colorado River Basin (UCRB) Field-Scale Example
+
+### Overview
+
+The `ucrb_example.py` script demonstrates **field-scale effective precipitation aggregation** using existing precipitation volumes stored in a GeoPackage file. This example shows how to apply pyCropWat methods to pre-computed field-level data without requiring new GEE downloads.
+
+### Key Features
+
+- **Field-scale analysis**: Works with individual agricultural fields/parcels
+- **GeoPackage input**: Reads existing precipitation volumes from vector data
+- **No GEE precipitation download**: Uses pre-existing monthly precipitation volumes
+- **Zonal AWC statistics**: Downloads SSURGO AWC data and calculates mean AWC per field
+- **Unit conversion**: Handles acre-feet ↔ mm conversions for method application
+- **Parallel processing**: Uses Dask for efficient multi-method calculation
+
+### Study Area
+
+**Upper Colorado River Basin (UCRB)** - Agricultural fields in the upper Colorado River watershed
+
+### Data Requirements
+
+| Data | Source | Description |
+|------|--------|-------------|
+| **Precipitation** | GeoPackage layer `PPT_VOLUME_ET_Demands` | Monthly volumes in acre-feet (columns: `PPT_VOLUME_mm_yy_acft`) |
+| **ETo** | GeoPackage layer `ETDa_VOLUME_ET_Demands` | Monthly ET volumes in acre-feet (columns: `ETDa_VOLUME_mm_yy_acft`) |
+| **AWC** | GEE SSURGO asset | Downloaded and cached as zonal means per field |
+| **Field geometry** | GeoPackage | Field polygons with `DRI_ID`, `ACRES_FTR_GEOM` |
+
+### Effective Precipitation Methods (8 methods)
+
+| Method | Description | Requires AWC/ETo |
+|--------|-------------|------------------|
+| CROPWAT | FAO CROPWAT method | No |
+| FAO/AGLW | FAO Dependable Rainfall (80% exceedance) | No |
+| Fixed 70% | Simple empirical method | No |
+| Dependable Rainfall | 75% probability level | No |
+| FarmWest | WSU irrigation scheduling formula | No |
+| USDA-SCS (MAD=0.5) | Site-specific method, default MAD factor | Yes |
+| USDA-SCS (MAD=1.0) | Site-specific method, full soil storage | Yes |
+| USDA-SCS (MAD=1.0, RD=2m) | Full soil storage, 2m rooting depth | Yes |
+
+### Unit Conversion Workflow
+
+```
+Input: Precipitation volume (acre-feet)
+    ↓ Divide by field area (acres) → Depth (feet)
+    ↓ Convert feet to mm (× 304.8)
+    ↓ Apply pyCropWat Peff method
+    ↓ Convert mm back to feet (÷ 304.8)
+    ↓ Multiply by field area (acres)
+Output: Effective precipitation volume (acre-feet)
+```
+
+### Workflow Steps
+
+1. **Load GeoPackage** - Read precipitation and ETo volumes from existing layers
+2. **Download AWC** - Get SSURGO AWC data from GEE, calculate zonal mean per field
+3. **Apply Methods** - Calculate Peff for all 8 methods across all time periods
+4. **Save Results** - Add new layers to GeoPackage with Peff volumes
+5. **Generate Statistics** - Create CSV summaries by year and method
+
+### Outputs
+
+| Output Type | Location | Description |
+|-------------|----------|-------------|
+| Peff Layers | Input GeoPackage | New layers: `Peff_CROPWAT`, `Peff_FAO_AGLW`, etc. |
+| AWC Cache | `UCRB/awc_data/field_awc_values.csv` | Mean AWC per field (DRI_ID) |
+| Annual Totals | `UCRB/summaries/annual_totals_by_method.csv` | Annual Peff totals by method |
+| Method Stats | `UCRB/summaries/method_comparison_statistics.csv` | Method comparison statistics |
+
+### Usage
+
+```bash
+# Basic usage (8 workers)
+python ucrb_example.py
+
+# Specify GEE project
+python ucrb_example.py --gee-project your-project-id
+
+# Skip AWC download if cached
+python ucrb_example.py --skip-awc-download
+
+# Use 16 workers
+python ucrb_example.py -w 16
+
+# Verbose logging
+python ucrb_example.py -v
+```
+
+### Python API for Field-Scale Aggregation
+
+For custom field-scale workflows, you can use pyCropWat methods directly:
+
+```python
+import numpy as np
+import geopandas as gpd
+from pycropwat.methods import (
+    cropwat_effective_precip,
+    usda_scs_effective_precip
+)
+
+# Load field data
+gdf = gpd.read_file('fields.gpkg', layer='precipitation')
+
+# Convert volume to depth
+FT_TO_MM = 304.8
+ppt_volume_acft = gdf['PPT_VOLUME_01_20_acft'].values
+area_acres = gdf['ACRES'].values
+ppt_mm = (ppt_volume_acft / area_acres) * FT_TO_MM
+
+# Apply pyCropWat method
+peff_mm = cropwat_effective_precip(ppt_mm)
+
+# Convert back to volume
+peff_acft = (peff_mm / FT_TO_MM) * area_acres
+
+# For USDA-SCS with AWC and ETo
+awc_values = gdf['mean_awc'].values  # mm/m
+eto_mm = (gdf['ETO_VOLUME_01_20_acft'].values / area_acres) * FT_TO_MM
+peff_scs_mm = usda_scs_effective_precip(
+    ppt_mm, eto_mm, awc_values, 
+    rooting_depth=1.0, mad_factor=0.5
+)
+```
+
+---
+
+## 3. Rio de la Plata Example (Global)
 
 ### Overview
 
@@ -197,7 +398,7 @@ Compares different effective precipitation calculation methods to help users und
 #### Methods Compared
 | Method | Formula | Description |
 |--------|---------|-------------|
-| **Ensemble** | Mean of 6 methods | Ensemble mean (default) |
+| **Ensemble** | Mean of 6 methods | Ensemble mean (default, excludes TAGEM-SuET and PCML) |
 | **CROPWAT** | Peff = P×(125-0.2P)/125 (P ≤ 250mm) or 0.1P+125 (P > 250mm) | CROPWAT method |
 | **FAO/AGLW** | Peff = 0.6×P - 10 (P ≤ 70mm) or 0.8×P - 24 (P > 70mm) | FAO Dependable Rainfall (80% exceedance) |
 | **Fixed 70%** | Peff = 0.70 × P | Simple fixed percentage method |
@@ -420,11 +621,11 @@ The script creates two sample zones for demonstrating zonal statistics:
 
 ---
 
-## 2. Arizona USDA-SCS Example (U.S.)
+## 4. Arizona USDA-SCS Example (U.S.)
 
 ### Overview
 
-The `arizona_example.py` script demonstrates the **USDA-SCS method** for effective precipitation using U.S.-specific high-resolution datasets for Arizona, with **comparisons to global datasets** and **all 8 Peff methods**.
+The `arizona_example.py` script demonstrates the **USDA-SCS method** for effective precipitation using U.S.-specific high-resolution datasets for Arizona, with **comparisons to global datasets** and **8 Peff methods** (excludes PCML).
 
 ### Study Area
 
@@ -534,11 +735,11 @@ Outputs include:
 
 ### Effective Precipitation Method Comparison
 
-Compares **all 8 methods** available in pyCropWat:
+Compares **all 8 methods** available in pyCropWat (excludes PCML):
 
 | Method | Description |
 |--------|-------------|
-| Ensemble | Mean of 6 methods (default, excludes TAGEM-SuET) |
+| Ensemble | Mean of 6 methods (default, excludes TAGEM-SuET and PCML) |
 | CROPWAT | CROPWAT formula |
 | FAO/AGLW | FAO Dependable Rainfall (80% exceedance) |
 | Fixed 70% | Simple fixed percentage |
@@ -546,7 +747,7 @@ Compares **all 8 methods** available in pyCropWat:
 | FarmWest | Pacific Northwest method |
 | USDA-SCS | Full USDA-SCS with AWC and ETo |
 | TAGEM-SuET | Turkish Irrigation Management System (P - ETo) |
-| Ensemble | Mean of 6 methods (excludes TAGEM-SuET) |
+| PCML | Physics-Constrained ML (Western U.S. only, 2000-2024) |
 
 Outputs include:
 - 2×3 spatial comparison maps for each dataset
@@ -576,21 +777,21 @@ python arizona_example.py --force-reprocess --gee-project your-project-id
 # GridMET with USDA-SCS
 pycropwat process --asset IDAHO_EPSCOR/GRIDMET --band pr \
     --gee-geometry users/montimajumdar/AZ \
-    --start-year 2000 --end-year 2024 --scale 4000 \
+    --start-year 2000 --end-year 2024 \
     --method usda_scs \
     --awc-asset projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite \
     --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \
-    --eto-band eto --rooting-depth 1.0 \
+    --eto-band eto --rooting-depth 1.0 --mad-factor 0.5 \
     --workers 8 --output ./Arizona/AZ_GridMET_USDA_SCS
 
 # PRISM with USDA-SCS  
 pycropwat process --asset projects/sat-io/open-datasets/OREGONSTATE/PRISM_800_MONTHLY --band ppt \
     --gee-geometry users/montimajumdar/AZ \
-    --start-year 2000 --end-year 2024 --scale 4000 \
+    --start-year 2000 --end-year 2024 \
     --method usda_scs \
     --awc-asset projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite \
     --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \
-    --eto-band eto --rooting-depth 1.0 \
+    --eto-band eto --rooting-depth 1.0 --mad-factor 0.5 \
     --workers 8 --output ./Arizona/AZ_PRISM_USDA_SCS
 ```
 

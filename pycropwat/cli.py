@@ -17,6 +17,26 @@ from pathlib import Path
 from .core import EffectivePrecipitation
 from .methods import list_available_methods
 
+# Default PCML asset for Western U.S. effective precipitation
+# Note: Only Western U.S. vectors overlapping the 17-state extent can be used with PCML
+# (AZ, CA, CO, ID, KS, MT, NE, NV, NM, ND, OK, OR, SD, TX, UT, WA, WY)
+PCML_DEFAULT_ASSET = 'projects/ee-peff-westus-unmasked/assets/effective_precip_monthly_unmasked'
+PCML_DEFAULT_BAND = 'pcml'  # Special marker - actual bands are bYYYY_M format (e.g., b2015_9, b2016_10)
+PCML_DEFAULT_SCALE = None  # Retrieved dynamically from asset using nominalScale()
+
+# PCML annual fraction asset (available WY 2000-2024)
+# Note: Only annual (water year, Oct-Sep) fractions are available for PCML, not monthly. Band format: bYYYY
+PCML_FRACTION_ASSET = 'projects/ee-peff-westus-unmasked/assets/effective_precip_fraction_unmasked'
+
+
+def get_pcml_band_name(year: int, month: int) -> str:
+    """Get PCML band name for a specific year and month.
+    
+    PCML bands are formatted as bYYYY_M where months 1-9 do not have a preceding zero.
+    Examples: b2015_9, b2016_10
+    """
+    return f"b{year}_{month}"
+
 
 def setup_logging(verbose: bool = False) -> None:
     """Configure logging based on verbosity."""
@@ -43,9 +63,14 @@ def cmd_process(args):
     logger = logging.getLogger(__name__)
     
     # Validate arguments
-    if args.geometry is None and args.gee_geometry is None:
-        logger.error("Either --geometry or --gee-geometry must be provided")
-        sys.exit(1)
+    # Note: PCML method doesn't require asset/band/geometry - it uses the PCML asset defaults
+    if args.method != 'pcml':
+        if args.asset is None or args.band is None:
+            logger.error("--asset and --band are required (except for PCML method)")
+            sys.exit(1)
+        if args.geometry is None and args.gee_geometry is None:
+            logger.error("Either --geometry or --gee-geometry must be provided (except for PCML method)")
+            sys.exit(1)
     
     if args.geometry is not None and not Path(args.geometry).exists():
         from .utils import is_gee_asset
@@ -97,6 +122,19 @@ def cmd_process(args):
                         "Global: projects/climate-engine-pro/assets/ce-ag-era5-v2/daily (set --eto-is-daily)")
             sys.exit(1)
     
+    # Handle PCML method - always use default asset (overrides any user-provided values)
+    if args.method == 'pcml':
+        args.asset = PCML_DEFAULT_ASSET
+        args.band = PCML_DEFAULT_BAND
+        # Scale will be retrieved dynamically from PCML asset using nominalScale()
+        args.scale = None  # Let core.py get it from asset
+        logger.info(f"Using PCML default asset: {PCML_DEFAULT_ASSET}")
+        logger.info(f"Using PCML default band: {PCML_DEFAULT_BAND}")
+        logger.info(f"PCML native scale will be retrieved from asset using nominalScale()")
+        logger.info(f"PCML annual fractions will be loaded from GEE asset: {PCML_FRACTION_ASSET}")
+        if args.geometry is None and args.gee_geometry is None:
+            logger.info(f"Using PCML asset geometry (entire Western U.S.)")
+    
     try:
         logger.info(f"Initializing effective precipitation processor...")
         logger.info(f"Asset: {args.asset}")
@@ -104,8 +142,10 @@ def cmd_process(args):
         logger.info(f"Method: {args.method}")
         if args.gee_geometry:
             logger.info(f"GEE Geometry Asset: {args.gee_geometry}")
-        else:
+        elif args.geometry:
             logger.info(f"Geometry: {args.geometry}")
+        elif args.method == 'pcml':
+            logger.info(f"Geometry: Using PCML asset's built-in geometry (Western U.S.)")
         logger.info(f"Date range: {args.start_year} - {args.end_year}")
         
         # Build method parameters
@@ -121,10 +161,12 @@ def cmd_process(args):
             method_params['eto_band'] = args.eto_band
             method_params['eto_is_daily'] = args.eto_is_daily
             method_params['rooting_depth'] = args.rooting_depth
+            method_params['mad_factor'] = args.mad_factor
             band_info = f"band: {args.awc_band}" if args.awc_band else "single-band"
             logger.info(f"AWC Asset: {args.awc_asset} ({band_info})")
             logger.info(f"ETo Asset: {args.eto_asset} (band: {args.eto_band})")
             logger.info(f"Rooting Depth: {args.rooting_depth} m")
+            logger.info(f"MAD Factor: {args.mad_factor}")
         elif args.method == 'suet':
             method_params['eto_asset'] = args.eto_asset
             method_params['eto_band'] = args.eto_band
@@ -137,12 +179,14 @@ def cmd_process(args):
             method_params['eto_band'] = args.eto_band
             method_params['eto_is_daily'] = args.eto_is_daily
             method_params['rooting_depth'] = args.rooting_depth
+            method_params['mad_factor'] = args.mad_factor
             method_params['percentage'] = args.percentage
             method_params['probability'] = args.probability
             band_info = f"band: {args.awc_band}" if args.awc_band else "single-band"
             logger.info(f"AWC Asset: {args.awc_asset} ({band_info})")
             logger.info(f"ETo Asset: {args.eto_asset} (band: {args.eto_band})")
             logger.info(f"Rooting Depth: {args.rooting_depth} m")
+            logger.info(f"MAD Factor: {args.mad_factor}")
         
         ep = EffectivePrecipitation(
             asset_id=args.asset,
@@ -507,7 +551,7 @@ def create_parser():
     parser.add_argument(
         '--version',
         action='version',
-        version='%(prog)s 1.1.1.post3'
+        version='%(prog)s 1.2'
     )
     
     parser.add_argument(
@@ -537,10 +581,14 @@ Examples:
                     --geometry roi.geojson \\
                     --start-year 2015 --end-year 2020 \\
                     --method fao_aglw --output ./output
+
+  # PCML method (Western U.S. only - no asset/band/geometry required)
+  pycropwat process --method pcml --start-year 2020 --end-year 2024 \\
+                    --output ./WesternUS_PCML --workers 8
         """
     )
-    process_parser.add_argument('--asset', '-a', required=True, help='GEE ImageCollection asset ID')
-    process_parser.add_argument('--band', '-b', required=True, help='Precipitation band name')
+    process_parser.add_argument('--asset', '-a', help='GEE ImageCollection asset ID (not required for PCML method)')
+    process_parser.add_argument('--band', '-b', help='Precipitation band name (not required for PCML method)')
     process_parser.add_argument('--geometry', '-g', type=str, help='Path to shapefile or GeoJSON')
     process_parser.add_argument('--gee-geometry', '-G', type=str, help='GEE FeatureCollection asset ID')
     process_parser.add_argument('--start-year', '-s', required=True, type=int, help='Start year')
@@ -552,8 +600,8 @@ Examples:
     process_parser.add_argument('--months', '-m', type=int, nargs='+', help='Specific months to process (1-12)')
     process_parser.add_argument('--project', '-p', type=str, help='GEE project ID')
     process_parser.add_argument('--method', type=str, default='ensemble',
-                               choices=['cropwat', 'fao_aglw', 'fixed_percentage', 'dependable_rainfall', 'farmwest', 'usda_scs', 'suet', 'ensemble'],
-                               help='Effective precipitation method')
+                               choices=['cropwat', 'fao_aglw', 'fixed_percentage', 'dependable_rainfall', 'farmwest', 'usda_scs', 'suet', 'pcml', 'ensemble'],
+                               help='Effective precipitation method (pcml uses default PCML asset for Western U.S.)')
     process_parser.add_argument('--percentage', type=float, default=0.7, help='Percentage for fixed_percentage method')
     process_parser.add_argument('--probability', type=float, default=0.75, help='Probability for dependable_rainfall method')
     # USDA-SCS method parameters
@@ -569,6 +617,8 @@ Examples:
                                help='Set if ETo asset is daily (will aggregate to monthly)')
     process_parser.add_argument('--rooting-depth', type=float, default=1.0,
                                help='Crop rooting depth in meters for usda_scs method (default: 1.0)')
+    process_parser.add_argument('--mad-factor', type=float, default=0.5,
+                               help='Management Allowed Depletion factor (0-1) for usda_scs method (default: 0.5)')
     process_parser.add_argument('--sequential', action='store_true', help='Process sequentially')
     add_common_args(process_parser)
     process_parser.set_defaults(func=cmd_process)

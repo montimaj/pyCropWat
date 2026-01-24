@@ -3,11 +3,11 @@ pyCropWat Arizona USDA-SCS Workflow Example
 ============================================
 
 This script demonstrates effective precipitation calculation for Arizona, USA
-comparing U.S.-based and global climate datasets with all 8 available methods.
+comparing U.S.-based and global climate datasets with all 9 available methods.
 
 The workflow uses an efficient approach:
 1. Download rasters once using USDA-SCS method (saves P, AWC, ETo)
-2. Calculate all 8 Peff methods locally from saved rasters
+2. Calculate all 9 Peff methods locally from saved rasters
 3. Perform temporal aggregation, statistical analysis, and visualization
 4. Compare U.S. vs Global datasets and all Peff methods
 
@@ -31,7 +31,6 @@ USDA-SCS Required Data (downloaded and saved for local calculation):
            band: ReferenceET_PenmanMonteith_FAO56)
 
 Effective Precipitation Methods Compared (8 total):
-- Ensemble - Mean of 6 methods (default, excludes TAGEM-SuET)
 - CROPWAT - Method from FAO CROPWAT
 - FAO/AGLW - FAO Dependable Rainfall (80% exceedance)
 - Fixed Percentage (70%) - Simple empirical method
@@ -39,6 +38,7 @@ Effective Precipitation Methods Compared (8 total):
 - FarmWest - WSU irrigation scheduling formula
 - USDA-SCS - Site-specific method with AWC and ETo
 - TAGEM-SuET - Turkish Irrigation Management System (P - ETo, if P > 75mm)
+- Ensemble - Mean of 6 methods (default, excludes TAGEM-SuET and PCML)
 
 Study Area:
 - Arizona (users/montimajumdar/AZ)
@@ -175,7 +175,7 @@ GLOBAL_DATASETS = {
 # Combined datasets dictionary
 DATASETS = {**US_DATASETS, **GLOBAL_DATASETS}
 
-# Effective precipitation methods to compare
+# Effective precipitation methods to compare (8 methods - excludes PCML)
 PEFF_METHODS = ['cropwat', 'fao_aglw', 'fixed_percentage', 'dependable_rainfall', 'farmwest', 'usda_scs', 'suet', 'ensemble']
 
 # Time period
@@ -451,7 +451,7 @@ def calculate_all_methods_from_rasters(dataset_name: str):
         logger.error(f"Run download_usda_scs_rasters('{dataset_name}') first")
         return
     
-    logger.info(f"Calculating all 8 Peff methods for {dataset_name} from saved rasters...")
+    logger.info(f"Calculating all 9 Peff methods for {dataset_name} from saved rasters...")
     
     # Load AWC data (static, only once)
     awc_file = input_dir / 'awc.tif'
@@ -1756,8 +1756,8 @@ def compare_methods_for_dataset(dataset_name: str, method_info: dict):
         'ensemble': ensemble_effective_precip(precip_total, eto_data, awc_data, ROOTING_DEPTH, 0.7, 0.75)
     }
     
-    # Create 2x4 comparison plot (8 methods)
-    fig, axes = plt.subplots(2, 4, figsize=(24, 12))
+    # Create 3x3 comparison plot (9 methods)
+    fig, axes = plt.subplots(3, 3, figsize=(24, 18))
     axes = axes.flatten()
     
     # Common color scale
@@ -1783,7 +1783,7 @@ def compare_methods_for_dataset(dataset_name: str, method_info: dict):
         ax.set_xlabel('Longitude [°]')
         ax.set_ylabel('Latitude [°]')
     
-    # Hide unused axes (9 subplots for 8 methods)
+    # Hide unused axes (if any)
     for idx in range(len(peff_methods), len(axes)):
         axes[idx].axis('off')
     
@@ -2182,7 +2182,7 @@ def run_full_workflow(skip_processing: bool = True, n_workers: int = 4):
     
     The workflow uses an efficient approach:
     1. Download rasters once using USDA-SCS method (saves P, AWC, ETo)
-    2. Calculate all 8 Peff methods locally from saved rasters
+    2. Calculate all 9 Peff methods locally from saved rasters
     3. Perform temporal aggregation, statistics, and visualization
     
     Parameters
@@ -2225,7 +2225,7 @@ def run_full_workflow(skip_processing: bool = True, n_workers: int = 4):
             n_workers=n_workers
         )
         
-        # Step 1b: Calculate all 8 Peff methods locally from saved rasters
+        # Step 1b: Calculate all 9 Peff methods locally from saved rasters
         calculate_all_methods_from_rasters(dataset_name)
         
         # Step 2: Temporal aggregation

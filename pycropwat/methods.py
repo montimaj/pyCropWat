@@ -31,6 +31,17 @@ evaporative demand (ETo). Requires additional GEE assets for AWC and ETo data.
 * suet: TAGEM-SuET (Turkish Irrigation Management and Plant Water Consumption System).
 Calculates effective precipitation based on the difference between P and ETo. Requires ETo data.
 
+* pcml: Physics-Constrained Machine Learning method (Hasan et al., 2025). Pre-computed Peff
+available as a GEE asset for the Western U.S. (17 states) from Jan 2000 to Sep 2024.
+Asset: projects/ee-peff-westus-unmasked/assets/effective_precip_monthly_unmasked
+Note: Only Western U.S. vectors overlapping the 17-state extent can be used with PCML.
+
+Note
+----
+For methods requiring ETo (usda_scs, suet, ensemble), crop evapotranspiration (ETc) can be
+used instead of grass reference ET (ETo) for more accurate crop-specific estimates.
+ETc = ETo × Kc, where Kc is the crop coefficient.
+
 Examples
 --------
 ```python
@@ -60,6 +71,12 @@ FAO. (1986). Yield response to water. FAO Irrigation and Drainage
     
 USDA SCS. (1993). Chapter 2 Irrigation Water Requirements. In Part 623
     National Engineering Handbook.
+
+Hasan, M. F., Smith, R. G., Majumdar, S., Huntington, J. L., Alves Meira Neto, A.,
+    & Minor, B. A. (2025). Satellite data and physics-constrained machine learning
+    for estimating effective precipitation in the Western United States and
+    application for monitoring groundwater irrigation. Agricultural Water Management,
+    319, 109821. https://doi.org/10.1016/j.agwat.2025.109821
 """
 
 import numpy as np
@@ -74,6 +91,7 @@ PeffMethod = Literal[
     "farmwest",
     "usda_scs",
     "suet",
+    "pcml",
     "ensemble"
 ]
 
@@ -201,17 +219,17 @@ def fixed_percentage_effective_precip(
 
 def dependable_rainfall_effective_precip(
     pr: np.ndarray,
-    probability: float = 0.80
+    probability: float = 0.75
 ) -> np.ndarray:
     r"""
     Calculate effective precipitation using the FAO Dependable Rainfall method.
     
-    This is the same as the FAO/AGLW method, based on 80% probability
-    exceedance. The formula estimates the amount of rainfall that can be
-    depended upon at a given probability level.
+    This method is based on the FAO/AGLW formula (80% probability exceedance)
+    but allows adjustment for different probability levels. The formula estimates
+    the amount of rainfall that can be depended upon at a given probability level.
     
-    Formula (80% probability exceedance - default)
-    -----------------------------------------------
+    Formula (at 80% probability exceedance)
+    ----------------------------------------
     $$
     P_{eff} = \begin{cases}
     \max(0.6P - 10, 0) & \text{if } P \leq 70 \text{ mm} \\
@@ -228,8 +246,9 @@ def dependable_rainfall_effective_precip(
         Monthly precipitation in mm.
     
     probability : float, optional
-        Probability level (0.5-0.9). Default is 0.80 (80%).
-        Higher probability = more conservative estimate.
+        Probability level (0.5-0.9). Default is 0.75 (75%).
+        Higher probability = lower Peff (plan for more irrigation).
+        Lower probability = higher Peff (riskier, less irrigation needed).
         
     Returns
     -------
@@ -258,10 +277,10 @@ def dependable_rainfall_effective_precip(
     )
     
     # Apply probability scaling
-    # At 50% probability, multiply by ~1.3
+    # At 50% probability, multiply by 1.3
     # At 80% probability, multiply by 1.0 (base case)
-    # At 90% probability, multiply by ~0.8
-    prob_scale = 1.0 + (0.80 - probability) * 1.0
+    # At 90% probability, multiply by 0.9
+    prob_scale = 1.80 - probability
     
     ep = ep_base * prob_scale
     return np.maximum(ep, 0).astype(np.float32)
@@ -305,7 +324,8 @@ def usda_scs_effective_precip(
     pr: np.ndarray,
     eto: np.ndarray,
     awc: np.ndarray,
-    rooting_depth: float = 1.0
+    rooting_depth: float = 1.0,
+    mad_factor: float = 0.5
 ) -> np.ndarray:
     r"""
     Calculate effective precipitation using the USDA-SCS method with AWC.
@@ -316,7 +336,7 @@ def usda_scs_effective_precip(
     
     Formula
     -------
-    1. Calculate soil storage depth: $d = AWC \times 0.5 \times D_r$ (rooting depth in inches)
+    1. Calculate soil storage depth: $d = AWC \times MAD \times D_r$ (rooting depth in inches)
     2. Calculate storage factor: $SF = 0.531747 + 0.295164 \cdot d - 0.057697 \cdot d^2 + 0.003804 \cdot d^3$
     3. Calculate effective precipitation:
        $P_{eff} = SF \times (P^{0.82416} \times 0.70917 - 0.11556) \times 10^{ET_o \times 0.02426}$
@@ -340,6 +360,10 @@ def usda_scs_effective_precip(
     rooting_depth : float, optional
         Crop rooting depth in meters. Default is 1.0 m.
         
+    mad_factor : float, optional
+        Management Allowed Depletion factor (0-1). Controls what fraction of
+        the soil water storage is considered available. Default is 0.5.
+        
     Returns
     -------
     np.ndarray
@@ -358,6 +382,10 @@ def usda_scs_effective_precip(
     - ETo data for U.S.: projects/openet/assets/reference_et/conus/gridmet/monthly/v1 (band: 'eto')
     - ETo data for global: projects/climate-engine-pro/assets/ce-ag-era5-v2/daily (band: 'ReferenceET_PenmanMonteith_FAO56')
     """
+    # Validate mad_factor
+    if not 0 <= mad_factor <= 1:
+        raise ValueError(f"mad_factor must be between 0 and 1, got {mad_factor}")
+    
     # Convert mm to inches for calculation
     pr_inches = pr / 25.4
     eto_inches = eto / 25.4
@@ -366,8 +394,8 @@ def usda_scs_effective_precip(
     rz_inches = rooting_depth * 39.37
     
     # Calculate soil storage depth (d term for eq. 2-85)
-    # d = AWC × 0.5 × rooting_depth_inches
-    d = awc * 0.5 * rz_inches
+    # d = AWC × MAD × rooting_depth_inches
+    d = awc * mad_factor * rz_inches
     
     # Calculate storage factor (sf) using polynomial equation (eq. 2-85)
     sf = 0.531747 + 0.295164 * d - 0.057697 * np.power(d, 2) + 0.003804 * np.power(d, 3)
@@ -408,6 +436,9 @@ def suet_effective_precip(
     exceeds ETo, the excess becomes effective precipitation, with a non-linear
     reduction for large excesses.
     
+    For more accurate crop-specific estimates, use crop evapotranspiration (ETc)
+    instead of grass reference ET (ETo) when available.
+    
     Formula
     -------
     $$
@@ -425,7 +456,8 @@ def suet_effective_precip(
         Total precipitation in mm.
     
     eto : np.ndarray
-        Reference evapotranspiration in mm.
+        Reference evapotranspiration (ETo) in mm. For more accurate crop-specific
+        estimates, use crop evapotranspiration (ETc) instead when available.
         
     Returns
     -------
@@ -452,6 +484,85 @@ def suet_effective_precip(
     )
     
     return np.maximum(ep, 0).astype(np.float32)
+
+
+def pcml_effective_precip(peff: np.ndarray) -> np.ndarray:
+    r"""
+    Physics-Constrained Machine Learning (PCML) effective precipitation.
+    
+    This method uses pre-computed effective precipitation from a machine learning
+    model trained with physics constraints. The PCML Peff data is available as a
+    GEE Image asset for the Western United States (17 states).
+    
+    Unlike other methods in this module, PCML does not compute Peff from precipitation.
+    Instead, it retrieves pre-computed Peff values from the GEE asset. This function
+    serves as a pass-through that validates and returns the input PCML Peff data.
+    
+    GEE Asset
+    ---------
+    ``projects/ee-peff-westus-unmasked/assets/effective_precip_monthly_unmasked``
+    
+    Coverage
+    --------
+    - **Region**: Western United States (17 states: AZ, CA, CO, ID, KS, MT, NE, NV,
+      NM, ND, OK, OR, SD, TX, UT, WA, WY)
+    - **Temporal**: January 2000 - September 2024 (monthly)
+    - **Resolution**: ~2 km (native scale retrieved dynamically from GEE asset)
+    - **Band Format**: ``bYYYY_M`` where M is month without leading zero
+      (e.g., ``b2015_9`` for September 2015, ``b2016_10`` for October 2016)
+    
+    Parameters
+    ----------
+    
+    peff : np.ndarray
+        Pre-computed effective precipitation from PCML GEE asset in mm.
+        This is retrieved from the GEE asset, not calculated.
+        
+    Returns
+    -------
+    np.ndarray
+        Effective precipitation in mm (pass-through).
+        
+    References
+    ----------
+    Hasan, M. F., Smith, R. G., Majumdar, S., Huntington, J. L., Alves Meira Neto, A.,
+    & Minor, B. A. (2025). Satellite data and physics-constrained machine learning
+    for estimating effective precipitation in the Western United States and
+    application for monitoring groundwater irrigation. Agricultural Water Management,
+    319, 109821. https://doi.org/10.1016/j.agwat.2025.109821
+    
+    Examples
+    --------
+    Using PCML via CLI (no asset/band/geometry required - uses defaults):
+    
+    ```bash
+    pycropwat process --method pcml \\
+        --start-year 2000 --end-year 2024 \\
+        --output ./WesternUS_PCML --workers 8
+    ```
+    
+    Or with a custom geometry to subset the region:
+    
+    ```bash
+    pycropwat process --method pcml \\
+        --geometry pacific_northwest.geojson \\
+        --start-year 2000 --end-year 2024 \\
+        --output ./PacificNW_PCML --workers 8
+    ```
+    
+    Notes
+    -----
+    - PCML is trained on Western U.S. data and should only be used in that region.
+    - **Geometry requirement**: Only Western U.S. vectors that overlap with the extent of the
+      17 states (AZ, CA, CO, ID, KS, MT, NE, NV, NM, ND, OK, OR, SD, TX, UT, WA, WY) can be used.
+    - The asset contains monthly effective precipitation values, not raw precipitation.
+    - When using ``--method pcml``, the default PCML asset is automatically used.
+    - Bands are automatically selected based on year/month (e.g., b2015_9 for Sep 2015).
+    - **Only annual (water year, Oct-Sep)** effective precipitation fractions are available for PCML (not monthly),
+      loaded directly from a separate GEE asset (band format: ``bYYYY``, e.g., ``b2020``).
+    """
+    # Pass-through function - PCML Peff is pre-computed in the GEE asset
+    return np.asarray(peff).astype(np.float32)
 
 
 def ensemble_effective_precip(
@@ -483,7 +594,8 @@ def ensemble_effective_precip(
         Total precipitation in mm.
     
     eto : np.ndarray
-        Reference evapotranspiration in mm.
+        Reference evapotranspiration (ETo) in mm. For more accurate crop-specific
+        estimates, use crop evapotranspiration (ETc) instead when available.
     
     awc : np.ndarray
         Available Water Capacity in inches/inch (volumetric fraction).
@@ -561,6 +673,7 @@ def get_method_function(method: PeffMethod):
         'farmwest': farmwest_effective_precip,
         'usda_scs': usda_scs_effective_precip,
         'suet': suet_effective_precip,
+        'pcml': pcml_effective_precip,
         'ensemble': ensemble_effective_precip,
     }
     
@@ -582,7 +695,7 @@ def list_available_methods() -> dict:
         Dictionary mapping method names to descriptions.
     """
     return {
-        'ensemble': 'Ensemble mean of 6 methods - default (excludes SuET, requires AWC and ETo)',
+        'ensemble': 'Ensemble mean of 6 methods - default (excludes SuET and PCML, requires AWC and ETo)',
         'cropwat': 'CROPWAT method from FAO',
         'fao_aglw': 'FAO/AGLW Dependable Rainfall (80% exceedance)',
         'fixed_percentage': 'Simple fixed percentage method (default 70%)',
@@ -590,4 +703,5 @@ def list_available_methods() -> dict:
         'farmwest': r'FarmWest method: $P_{eff} = (P - 5) \times 0.75$',
         'usda_scs': 'USDA-SCS method with AWC and ETo (requires GEE assets)',
         'suet': 'TAGEM-SuET method based on P - ETo (requires ETo asset)',
+        'pcml': 'Physics-Constrained ML (Western U.S. 17 states only, Jan 2000 - Sep 2024, GEE asset; only Western U.S. vectors can be used)',
     }
