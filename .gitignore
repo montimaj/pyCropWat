@@ -224,3 +224,5 @@ Examples/*
 # Other large files
 *.pdf
 *.pptx
+*.gpkg
+calc*.py

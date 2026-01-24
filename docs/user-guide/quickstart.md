@@ -85,7 +85,7 @@ ep = EffectivePrecipitation(
 
 ## Effective Precipitation Methods
 
-pyCropWat supports eight methods for calculating effective precipitation:
+pyCropWat supports nine methods for calculating effective precipitation:
 
 | Method | Formula | Use Case |
 |--------|---------|----------|
@@ -96,7 +96,8 @@ pyCropWat supports eight methods for calculating effective precipitation:
 | `farmwest` | Peff = (P - 5) × 0.75 | Pacific Northwest irrigation |
 | `usda_scs` | Uses AWC, ETo, and soil storage | Site-specific with soil data |
 | `suet` | P ≤ ETo: 0 <br> P - ETo < 75: P - ETo <br> else: 75 + f(P - ETo - 75) | TAGEM-SuET method (P - ETo with 75mm cap) |
-| `ensemble` | Mean of 6 methods (excludes TAGEM-SuET) | Default - robust multi-method estimate |
+| `pcml` | Pre-computed ML model | Western U.S. only (uses default GEE asset) |
+| `ensemble` | Mean of 6 methods (excludes TAGEM-SuET and PCML) | Default - robust multi-method estimate |
 
 **CLI:**
 
@@ -132,7 +133,7 @@ pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitatio
     --scale-factor 1000 --method usda_scs \
     --awc-asset projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite \
     --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \
-    --rooting-depth 1.0 --output ./output
+    --rooting-depth 1.0 --mad-factor 0.5 --output ./output
 
 # SuET method (requires ETo asset)
 pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitation_sum \
@@ -140,7 +141,21 @@ pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitatio
     --scale-factor 1000 --method suet \
     --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \
     --output ./output
+
+# PCML method (Western U.S. only - no geometry needed, uses PCML asset's built-in geometry)
+pycropwat process --start-year 2000 --end-year 2024 \
+    --method pcml --output ./output
 ```
+
+!!! note "PCML Default Asset and Annual Fractions"
+    When using `--method pcml`, the default PCML asset (`projects/ee-peff-westus-unmasked/assets/effective_precip_monthly_unmasked`) is automatically used. **No geometry is required** - the PCML asset's built-in geometry covers the entire Western U.S. (17 states). Bands are dynamically selected based on the year/month being processed (format: `bYYYY_M`, e.g., `b2015_9` for September 2015). The `--asset` and `--band` arguments are overridden. The native scale (~2km) is retrieved from the asset using GEE's `nominalScale()` function. **Only annual (water year, Oct-Sep)** effective precipitation fractions are available for PCML (not monthly), loaded directly from a separate GEE asset (`projects/ee-peff-westus-unmasked/assets/effective_precip_fraction_unmasked`, WY 2000-2024, band format: `bYYYY`).
+
+!!! tip "PCML Geometry Options"
+    - **No geometry provided**: Downloads the entire PCML asset (full Western U.S. - 17 states)
+    - **User provides geometry**: PCML data is clipped/subsetted to that geometry. **Note:** Only Western U.S. vectors that overlap with the 17-state extent can be used (e.g., AZ.geojson, pacific_northwest.geojson)
+
+!!! warning "PCML and save_inputs"
+    For PCML, set `save_inputs=False` (the default). The PCML effective precipitation comes directly from the GEE asset, not calculated from raw precipitation. Setting `save_inputs=True` would save redundant copies of the data labeled as "precipitation" when they are actually effective precipitation.
 
 **Python:**
 
@@ -165,7 +180,7 @@ peff_farmwest = farmwest_effective_precip(precip)
 # USDA-SCS method requires ETo and AWC arrays
 eto = np.array([80, 120, 180, 220])  # mm
 awc = np.array([0.15, 0.15, 0.15, 0.15])  # volumetric fraction
-peff_usda = usda_scs_effective_precip(precip, eto, awc, rooting_depth=1.0)
+peff_usda = usda_scs_effective_precip(precip, eto, awc, rooting_depth=1.0, mad_factor=0.5)
 
 # SuET method requires ETo array
 peff_suet = suet_effective_precip(precip, eto)
@@ -429,6 +444,8 @@ pyCropWat generates two GeoTIFF files per month:
 |------|-------------|-------|
 | `effective_precip_YYYY_MM.tif` | Effective precipitation | mm |
 | `effective_precip_fraction_YYYY_MM.tif` | Effective/Total precipitation ratio | fraction (0-1) |
+
+> **Note:** For the PCML method, fraction files are annual (water year): `effective_precip_fraction_YYYY.tif` (one per year, WY 2000-2024).
 
 Example output directory:
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pycropwat"
-version = "1.1.1.post3"
+version = "1.2"
 description = "A Python Package for Computing Effective Precipitation Using Google Earth Engine Climate Data"
 readme = "README.md"
 license = {text = "MIT"}
@@ -13,6 +13,8 @@ authors = [
     {name = "Peter ReVelle", email = "peter.revelle@dri.edu"},
     {name = "Christopher Pearson", email = "christopher.pearson@dri.edu"},
     {name = "Soheil Nozari", email = "soheil.nozari@colostate.edu"},
+    {name = "Blake A. Minor", email = "blake.minor@dri.edu"},
+    {name = "M. F. Hasan", email = "fahim.hasan@colostate.edu"},
     {name = "Justin L. Huntington", email = "justin.huntington@dri.edu"},
     {name = "Ryan G. Smith", email = "ryan.g.smith@colostate.edu"}   
 ]

@@ -166,7 +166,7 @@ peff_farmwest = farmwest_effective_precip(precip)
 # ETo is reference evapotranspiration in mm
 eto = np.array([80, 120, 180, 220, 260])  # mm
 awc = np.array([0.15, 0.15, 0.15, 0.15, 0.15])  # volumetric fraction
-peff_usda = usda_scs_effective_precip(precip, eto, awc, rooting_depth=1.0)
+peff_usda = usda_scs_effective_precip(precip, eto, awc, rooting_depth=1.0, mad_factor=0.5)
 
 # SuET method (requires ETo array)
 from pycropwat.methods import suet_effective_precip
@@ -192,7 +192,8 @@ ep = EffectivePrecipitation(
         'awc_band': 'AWC',
         'eto_asset': 'projects/openet/assets/reference_et/conus/gridmet/monthly/v1',
         'eto_band': 'eto',
-        'rooting_depth': 1.0
+        'rooting_depth': 1.0,
+        'mad_factor': 0.5
     }
 )
 
@@ -211,7 +212,8 @@ ep_global = EffectivePrecipitation(
         'eto_asset': 'projects/climate-engine-pro/assets/ce-ag-era5-v2/daily',
         'eto_band': 'ReferenceET_PenmanMonteith_FAO56',
         'eto_is_daily': True,  # Will aggregate daily to monthly
-        'rooting_depth': 1.0
+        'rooting_depth': 1.0,
+        'mad_factor': 0.5
     }
 )
 ```

@@ -48,6 +48,9 @@ Effective Precipitation Methods
 - ``'fixed_percentage'`` - Simple fixed percentage method
 - ``'dependable_rainfall'`` - FAO Dependable Rainfall method
 - ``'farmwest'`` - FarmWest method
+- ``'usda_scs'`` - USDA-SCS method (requires AWC and ETo assets)
+- ``'suet'`` - TAGEM-SuET method (requires ETo asset)
+- ``'pcml'`` - Physics-Constrained ML (Western U.S. only, pre-computed GEE asset)
 - ``'usda_scs'`` - USDA-SCS soil moisture depletion method
 - ``'suet'`` - TAGEM-SuET method (Turkish Irrigation Management System)
 
@@ -89,7 +92,7 @@ from .analysis import (
     export_to_cog,
 )
 
-__version__ = "1.1.1.post3"
+__version__ = "1.2"
 __all__ = [
     # Core
     "EffectivePrecipitation",

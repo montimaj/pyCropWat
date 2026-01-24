@@ -3,14 +3,15 @@
   <img src="assets/pyCropWat_logo.png" alt="pyCropWat Logo" width="200"><br>
 </p>
 
-[![Release](https://img.shields.io/badge/release-v1.1.1--post3-green.svg)](https://github.com/montimaj/pyCropWat/releases)
+[![Release](https://img.shields.io/badge/release-v1.2-green.svg)](https://github.com/montimaj/pyCropWat/releases)
 [![PyPI](https://img.shields.io/pypi/v/pycropwat.svg)](https://pypi.org/project/pycropwat/)
 [![Downloads](https://static.pepy.tech/badge/pycropwat/month)](https://pepy.tech/project/pycropwat)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18201620.svg)](https://doi.org/10.5281/zenodo.18201620)
 [![GitHub stars](https://img.shields.io/github/stars/montimaj/pyCropWat)](https://github.com/montimaj/pyCropWat/stargazers)
-[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://montimaj.github.io/pyCropWat)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://montimaj.github.io/pyCropWat)
+[![GEE](https://img.shields.io/badge/Google%20Earth%20Engine-4285F4?logo=google-earth&logoColor=white)](https://earthengine.google.com/)
 
 <p align="center">
   <img src="assets/pyCropWat.gif" alt="pyCropWat Demo">
@@ -27,7 +28,7 @@ pip install pycropwat
 pyCropWat is a Python package that calculates effective precipitation using multiple methodologies from any Google Earth Engine (GEE) climate dataset. It supports:
 
 - **Multiple GEE datasets**: Any ImageCollection from the [GEE Data Catalog](https://developers.google.com/earth-engine/datasets) or [Community Catalog](https://gee-community-catalog.org/) (e.g., ERA5-Land, TerraClimate, CHIRPS, GPM IMERG)
-- **Multiple Peff methods**: CROPWAT, FAO/AGLW, Fixed Percentage, Dependable Rainfall, FarmWest, USDA-SCS, TAGEM-SuET, Ensemble
+- **Multiple Peff methods**: CROPWAT, FAO/AGLW, Fixed Percentage, Dependable Rainfall, FarmWest, USDA-SCS, TAGEM-SuET, PCML, Ensemble
 - **Flexible geometry inputs**: Shapefiles, GeoJSON, or GEE FeatureCollection assets
 - **Automatic chunked downloads**: Handles large regions that exceed GEE pixel limits
 - **Temporal aggregation**: Annual, seasonal, growing season (with cross-year support for Southern Hemisphere), climatology
@@ -50,7 +51,7 @@ $$
 
 ## Effective Precipitation Methods
 
-pyCropWat supports eight different methods for calculating effective precipitation:
+pyCropWat supports nine different methods for calculating effective precipitation:
 
 ### 1. CROPWAT
 
@@ -113,9 +114,9 @@ The FAO Dependable Rainfall method is the same as the FAO/AGLW method, based on 
 | P > 70 mm | $P_{eff} = 0.8P - 24$ |
 
 A probability scaling factor is applied for other probability levels:
-- 50% probability: ~1.3× base estimate
+- 50% probability: 1.3× base estimate
 - 80% probability: 1.0× base estimate (default)
-- 90% probability: ~0.9× base estimate
+- 90% probability: 0.9× base estimate
 
 **Usage:**
 ```python
@@ -145,7 +146,7 @@ ep = EffectivePrecipitation(..., method='farmwest')
 
 ### 6. USDA-SCS (with AWC and ETo)
 
-The USDA Soil Conservation Service method that accounts for soil water holding capacity (AWC) and reference evapotranspiration (ETo). This method is more site-specific than other methods.
+The USDA Soil Conservation Service method that accounts for soil water holding capacity (AWC) and reference evapotranspiration (ETo). This method is more site-specific than other methods. Replace ETo with crop evapotranspiration (ETc) when available for more accurate results.
 
 **Formula:**
 
@@ -154,16 +155,19 @@ The USDA Soil Conservation Service method that accounts for soil water holding c
 3. Effective precipitation: $P_{eff} = sf \times (P^{0.82416} \times 0.70917 - 0.11556) \times 10^{ET_o \times 0.02426}$
 4. Clamped: $P_{eff} = \min(P_{eff}, P, ET_o)$, $P_{eff} \geq 0$
 
+!!! tip "Using ETc Instead of ETo"
+    For more accurate crop-specific estimates, replace ETo (grass reference ET) with ETc (crop evapotranspiration) when available. ETc accounts for crop coefficients (Kc) and provides better estimates for specific crops. OpenET and similar platforms provide ETc data for agricultural fields.
+
 **Required GEE Assets:**
 
-| Region | AWC Asset | ETo Asset |
-|--------|-----------|----------|
-| **U.S.** | `projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite` | `projects/openet/assets/reference_et/conus/gridmet/monthly/v1` |
-| **Global** | `projects/sat-io/open-datasets/FAO/HWSD_V2_SMU` | `projects/climate-engine-pro/assets/ce-ag-era5-v2/daily` |
+| Region | Precipitation Asset | AWC Asset | ETo Asset |
+|--------|---------------------|-----------|-----------|
+| **U.S.** | `IDAHO_EPSCOR/GRIDMET` (band: `pr`, daily) | `projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite` | `projects/openet/assets/reference_et/conus/gridmet/monthly/v1` (band: `eto`) |
+| **Global** | `ECMWF/ERA5_LAND/MONTHLY_AGGR` (band: `total_precipitation_sum`) | `projects/sat-io/open-datasets/FAO/HWSD_V2_SMU` (band: `AWC`) | `projects/climate-engine-pro/assets/ce-ag-era5-v2/daily` (band: `ReferenceET_PenmanMonteith_FAO56`) |
 
 **Usage (CLI - U.S.):**
 ```bash
-pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitation_sum \
+pycropwat process --asset IDAHO_EPSCOR/GRIDMET --band pr \
     --method usda_scs \
     --awc-asset projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite \
     --eto-asset projects/openet/assets/reference_et/conus/gridmet/monthly/v1 \
@@ -201,6 +205,9 @@ $$
 !!! warning "Performance Note"
     Studies have shown that the TAGEM-SuET method tends to underperform compared to other methods, particularly in arid and semi-arid climates where ETo often exceeds precipitation. In our method comparison analyses, TAGEM-SuET consistently produced the lowest effective precipitation estimates. Users should consider this limitation when selecting a method for their application.
 
+!!! tip "Using ETc Instead of ETo"
+    For more accurate crop-specific estimates, replace ETo (grass reference ET) with ETc (crop evapotranspiration) when available. ETc = ETo × Kc, where Kc is the crop coefficient.
+
 **Reference:** [Muratoglu, A., Bilgen, G. K., Angin, I., & Kodal, S. (2023). Performance analyses of effective rainfall estimation methods for accurate quantification of agricultural water footprint. *Water Research*, 238, 120011.](https://doi.org/10.1016/j.watres.2023.120011)
 
 **Usage:**
@@ -221,7 +228,49 @@ pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitatio
 
 ---
 
-### 8. Ensemble - Default (Mean of Methods)
+### 8. PCML (Physics-Constrained Machine Learning)
+
+The PCML method uses pre-computed effective precipitation from a physics-constrained machine learning model trained specifically for the Western United States. Unlike other methods, PCML Peff is retrieved directly from a GEE asset rather than calculated from precipitation.
+
+**Coverage:**
+
+| Attribute | Value |
+|-----------|-------|
+| **Region** | Western U.S. (17 states: AZ, CA, CO, ID, KS, MT, NE, NV, NM, ND, OK, OR, SD, TX, UT, WA, WY) |
+| **Temporal** | January 2000 - September 2024 (monthly) |
+| **Resolution** | ~2 km (native scale retrieved dynamically from GEE asset) |
+| **GEE Asset** | `projects/ee-peff-westus-unmasked/assets/effective_precip_monthly_unmasked` |
+| **Band Format** | `bYYYY_M` (e.g., `b2015_9`, `b2016_10`) - bands auto-selected by year/month |
+
+!!! note "Pre-computed Data with Annual Fractions"
+    PCML is different from other methods - it provides pre-computed Peff values from a trained ML model. When using `--method pcml`, the default PCML asset is automatically used and bands are dynamically selected based on the year/month being processed. The native scale (~2km) is retrieved from the asset using GEE's `nominalScale()` function. **Only annual (water year, Oct-Sep)** effective precipitation fractions are available for PCML (not monthly), loaded directly from a separate GEE asset (`projects/ee-peff-westus-unmasked/assets/effective_precip_fraction_unmasked`, WY 2000-2024, band format: `bYYYY`).
+
+!!! tip "PCML Geometry Options"
+    - **No geometry provided**: Downloads the entire PCML asset (full Western U.S. - 17 states)
+    - **User provides geometry**: PCML data is clipped/subsetted to that geometry (e.g., just Pacific Northwest states), reducing download size and processing time
+
+**Usage (CLI - full Western U.S.):**
+```bash
+pycropwat process \
+    --method pcml \
+    --start-year 2000 --end-year 2024 \
+    --output ./WesternUS_PCML
+```
+
+**Usage (CLI - subset to specific region):**
+```bash
+pycropwat process \
+    --method pcml \
+    --geometry pacific_northwest.geojson \
+    --start-year 2000 --end-year 2024 \
+    --output ./PacificNW_PCML
+```
+
+**Reference:** [Hasan, M. F., Smith, R. G., Majumdar, S., Huntington, J. L., Alves Meira Neto, A., & Minor, B. A. (2025). Satellite data and physics-constrained machine learning for estimating effective precipitation in the Western United States and application for monitoring groundwater irrigation. *Agricultural Water Management*, 319, 109821.](https://doi.org/10.1016/j.agwat.2025.109821)
+
+---
+
+### 9. Ensemble - Default (Mean of Methods)
 
 The ensemble method provides a robust estimate by calculating the mean of six methods, excluding TAGEM-SuET which has been shown to underperform in comparative analyses. This multi-method average reduces bias from any single method.
 
@@ -276,10 +325,12 @@ pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitatio
 | **FarmWest** | Pacific Northwest irrigation | Simple, accounts for interception loss |
 | **USDA-SCS** | Site-specific irrigation | Accounts for soil AWC and ETo |
 | **TAGEM-SuET** | ET-based irrigation planning | Based on P - ETo difference |
-| **Ensemble** | Robust multi-method estimate | Mean of 6 methods (excludes TAGEM-SuET) |
+| **PCML** | Western U.S. applications | ML-based, pre-computed (2000-2024) |
+| **Ensemble** | Robust multi-method estimate | Mean of 6 methods (excludes TAGEM-SuET and PCML) |
 
 !!! tip "Choosing a Method"
     - Use **Ensemble** (default) for robust multi-method estimates when soil and ETo data are available
+    - Use **PCML** for Western U.S. applications (2000-2024) - trained specifically for that region
     - Use **CROPWAT** for most irrigation planning applications when soil data is unavailable
     - Use **FAO/AGLW** or **Dependable Rainfall** when following FAO Irrigation Paper No. 33 guidelines (they use the same base formula)
     - Use **Fixed Percentage** when you have locally calibrated effectiveness values
@@ -344,9 +395,9 @@ viz.plot_time_series(2020, 2023, output_path='./timeseries.png')
 
 ## Features
 
-### ✅ Implemented
+### ✅ Implemented (v1)
 
-- 📊 **Multiple Peff methods**: CROPWAT, FAO/AGLW, Fixed Percentage, Dependable Rainfall, FarmWest, USDA-SCS, TAGEM-SuET
+- 📊 **Multiple Peff methods**: CROPWAT, FAO/AGLW, Fixed Percentage, Dependable Rainfall, FarmWest, USDA-SCS, TAGEM-SuET, PCML (Western U.S.), Ensemble
 - 🗓️ **Temporal aggregation**: Annual, seasonal, growing season (with cross-year support), climatology
 - 📈 **Statistical analysis**: Anomaly detection, trend analysis (linear, Theil-Sen), zonal statistics
 - 📉 **Visualization**: Time series, climatology charts, maps, interactive HTML maps, dataset comparison (side-by-side, scatter, annual)
@@ -355,6 +406,7 @@ viz.plot_time_series(2020, 2023, output_path='./timeseries.png')
 - 🗺️ **Flexible resolution control** (native or custom scale)
 - ⚡ **Parallel processing** with Dask
 - 🧩 **Automatic tiling** for large regions (in-memory mosaicking)
+- 📁 **Example workflows**: South America, Arizona, New Mexico, Western U.S. PCML, UCRB field-scale
 
 ### 🚧 Planned
 
@@ -407,7 +459,7 @@ The following visualizations are generated by the [complete workflow example](ex
   <img src="assets/examples/method_comparison/ERA5Land_method_maps_2020_01.png" width="100%" alt="Method Comparison Maps">
 </p>
 
-*Comparison of all 8 effective precipitation methods: CROPWAT, FAO/AGLW, Fixed Percentage (70%), Dependable Rainfall (80%), FarmWest, USDA-SCS, TAGEM-SuET, and Ensemble.*
+*Comparison of all 9 effective precipitation methods: CROPWAT, FAO/AGLW, Fixed Percentage (70%), Dependable Rainfall (80%), FarmWest, USDA-SCS, TAGEM-SuET, PCML (Western U.S. only), and Ensemble.*
 
 <p align="center">
   <img src="assets/examples/method_comparison/ERA5Land_method_curves.png" width="60%" alt="Method Curves">
@@ -448,19 +500,19 @@ The [Arizona workflow](examples.md#arizona-usda-scs-example) demonstrates U.S.-s
 
 ### New Mexico Example (8-Method Comparison)
 
-The [New Mexico workflow](examples.md#example-12-new-mexico-prism-workflow) compares all 8 effective precipitation methods using PRISM data:
+The [New Mexico workflow](examples.md#example-12-new-mexico-prism-workflow) compares 8 effective precipitation methods using PRISM data (excludes PCML):
 
 <p align="center">
   <img src="assets/examples/new_mexico/method_comparison/mean_annual_comparison_1986_2025.png" width="100%" alt="New Mexico Mean Annual Comparison">
 </p>
 
-*Mean annual effective precipitation (1986-2025) for all 8 methods: CROPWAT, FAO/AGLW, Fixed 70%, Dependable Rainfall, FarmWest, USDA-SCS, TAGEM-SuET, and Ensemble.*
+*Mean annual effective precipitation (1986-2025) for 8 methods: CROPWAT, FAO/AGLW, Fixed 70%, Dependable Rainfall, FarmWest, USDA-SCS, TAGEM-SuET, and Ensemble.*
 
 <p align="center">
   <img src="assets/examples/new_mexico/method_comparison/method_curves_new_mexico.png" width="60%" alt="New Mexico Method Curves">
 </p>
 
-*Theoretical response curves for all 8 effective precipitation methods using New Mexico typical values (AWC=120mm/m, ETo=200mm/month).*
+*Theoretical response curves for 8 effective precipitation methods using New Mexico typical values (AWC=120mm/m, ETo=200mm/month).*
 
 ## Documentation
 
@@ -497,6 +549,21 @@ For full documentation, visit [https://montimaj.github.io/pyCropWat](https://mon
     ```bash
     # Full workflow with GEE processing (generates ~14 GB of output data)
     python Examples/new_mexico_example.py --gee-project your-project-id --workers 8
+    ```
+    
+    **Western U.S. PCML Example (17 states):**
+    ```bash
+    # PCML effective precipitation with water year aggregation
+    python Examples/western_us_pcml_example.py --gee-project your-project-id --workers 8
+    
+    # Analysis only (requires previously generated data)
+    python Examples/western_us_pcml_example.py --analysis-only
+    ```
+    
+    **UCRB Field-Scale Example (GeoPackage):**
+    ```bash
+    # Field-scale Peff from existing precipitation volumes
+    python Examples/ucrb_example.py
     ```
 
 ## U.S.-Specific Datasets
@@ -538,7 +605,7 @@ If you use pyCropWat in your research, please cite:
 
 ```bibtex
 @software{pycropwat,
-  author = {Majumdar, Sayantan and ReVelle, Peter and Pearson, Christopher and Nozari, Soheil and Huntington, Justin L. and Smith, Ryan G.},
+  author = {Majumdar, Sayantan and ReVelle, Peter and Pearson, Christopher and Nozari, Soheil and Minor, Blake A. and Hasan, M. F. and Huntington, Justin L. and Smith, Ryan G.},
   title = {pyCropWat: A Python Package for Computing Effective Precipitation Using Google Earth Engine Climate Data},
   year = {2026},
   url = {https://github.com/montimaj/pyCropWat},
