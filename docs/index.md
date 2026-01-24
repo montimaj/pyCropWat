@@ -547,13 +547,13 @@ For full documentation, visit [https://montimaj.github.io/pyCropWat](https://mon
     
     **New Mexico 8-Method Comparison:**
     ```bash
-    # Full workflow with GEE processing (generates ~14 GB of output data)
+    # Full workflow with GEE processing (generates ~8 GB of output data)
     python Examples/new_mexico_example.py --gee-project your-project-id --workers 8
     ```
     
     **Western U.S. PCML Example (17 states):**
     ```bash
-    # PCML effective precipitation with water year aggregation
+    # PCML effective precipitation with water year aggregation (generates ~3 GB of output data)
     python Examples/western_us_pcml_example.py --gee-project your-project-id --workers 8
     
     # Analysis only (requires previously generated data)
@@ -562,7 +562,8 @@ For full documentation, visit [https://montimaj.github.io/pyCropWat](https://mon
     
     **UCRB Field-Scale Example (GeoPackage):**
     ```bash
-    # Field-scale Peff from existing precipitation volumes
+    # Field-scale Peff from existing precipitation volumes (~3 MB of output data)
+    # Note: The GeoPackage file (~7 GB) is not included; contact authors for access
     python Examples/ucrb_example.py
     ```
 
