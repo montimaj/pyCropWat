@@ -72,7 +72,6 @@ pyCropWat/
 │   └── workflows/
 │       ├── docs.yml         # GitHub Pages deployment workflow
 │       └── publish.yml      # PyPI publishing workflow
-├── .zenodo.json             # Zenodo metadata for DOI generation
 ├── CHANGELOG.md             # Release notes
 ├── MANIFEST.in              # PyPI package manifest
 ├── mkdocs.yml               # MkDocs configuration
