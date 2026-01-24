@@ -135,7 +135,7 @@ All notable changes to pyCropWat will be documented in this file.
 - Added PyPI publishing workflow via GitHub Actions with trusted publishing
 - Added `MANIFEST.in` to exclude large example files from PyPI package
 - Updated package description to "A Python Package for Computing Effective Precipitation Using Google Earth Engine Climate Data"
-- Added Zenodo DOI (`10.5281/zenodo.18201620`) to citation
+- Added Zenodo DOI (`10.5281/zenodo.18201619`) to citation
 
 ### 🔧 Fixes
 - Fixed Git clone URLs to use correct repository path (`montimaj/pyCropWat`)

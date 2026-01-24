@@ -3,7 +3,7 @@
 [![Release](https://img.shields.io/badge/release-v1.2-green.svg)](https://github.com/montimaj/pyCropWat/releases)
 [![PyPI](https://img.shields.io/pypi/v/pycropwat.svg)](https://pypi.org/project/pycropwat/)
 [![Downloads](https://static.pepy.tech/badge/pycropwat/month)](https://pepy.tech/project/pycropwat)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18201620.svg)](https://doi.org/10.5281/zenodo.18201620)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18201619.svg)](https://doi.org/10.5281/zenodo.18201619)
 [![GitHub stars](https://img.shields.io/github/stars/montimaj/pyCropWat)](https://github.com/montimaj/pyCropWat/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
@@ -1240,7 +1240,7 @@ If you use pyCropWat in your research, please cite:
   title = {pyCropWat: A Python Package for Computing Effective Precipitation Using Google Earth Engine Climate Data},
   year = {2026},
   url = {https://github.com/montimaj/pyCropWat},
-  doi = {10.5281/zenodo.18201620}
+  doi = {10.5281/zenodo.18201619}
 }
 ```
 
