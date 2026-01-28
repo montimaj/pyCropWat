@@ -150,7 +150,7 @@ The USDA Soil Conservation Service method that accounts for soil water holding c
 
 **Formula:**
 
-1. Soil storage depth: $d = AWC \times 0.5 \times D_{root}$ (in inches)
+1. Soil storage depth: $d = AWC \times MAD \times D_{root}$ (in inches), where $MAD$ is the Maximum Allowable Depletion factor (default: 0.5)
 2. Storage factor: $sf = 0.531747 + 0.295164 \cdot d - 0.057697 \cdot d^2 + 0.003804 \cdot d^3$
 3. Effective precipitation: $P_{eff} = sf \times (P^{0.82416} \times 0.70917 - 0.11556) \times 10^{ET_o \times 0.02426}$
 4. Clamped: $P_{eff} = \min(P_{eff}, P, ET_o)$, $P_{eff} \geq 0$

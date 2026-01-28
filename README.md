@@ -182,7 +182,7 @@ Assumes the first 5 mm is lost to interception/evaporation, and 75% of the remai
 
 The USDA Soil Conservation Service method that accounts for soil water holding capacity and evaporative demand:
 
-1. Calculate soil storage depth: `d = AWC × MAD × rooting_depth` (MAD = Management Allowed Depletion, default 0.5)
+1. Calculate soil storage depth: `d = AWC × MAD × rooting_depth` (MAD = Maximum Allowable Depletion, default 0.5)
 2. Calculate storage factor: `sf = 0.531747 + 0.295164×d - 0.057697×d² + 0.003804×d³`
 3. Calculate effective precipitation: `Peff = sf × (P^0.82416 × 0.70917 - 0.11556) × 10^(ETo × 0.02426)`
 4. Peff is clamped between 0 and min(P, ETo)
