@@ -188,7 +188,7 @@ def cmd_process(args):
             logger.info(f"AWC Asset: {args.awc_asset} ({band_info}, scale_factor={args.awc_scale_factor})")
             logger.info(f"ETo Asset: {args.eto_asset} (band: {args.eto_band})")
             logger.info(f"Rooting Depth: {args.rooting_depth} m")
-            logger.info(f"MAD Factor: {args.mad_factor})"
+            logger.info(f"MAD Factor: {args.mad_factor}")
         
         ep = EffectivePrecipitation(
             asset_id=args.asset,
