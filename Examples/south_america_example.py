@@ -84,7 +84,7 @@ STUDY_AREA_ASSET = "projects/ssebop-471916/assets/Riodelaplata"
 
 # Global datasets (FAO Soil AWC and AgERA5 ETo for South America)
 AWC_ASSET = "projects/sat-io/open-datasets/FAO/HWSD_V2_SMU"  # FAO Harmonized World Soil Database
-AWC_BAND = "AWC"  # Available Water Capacity
+AWC_BAND = "AWC"  # Available Water Capacity (mm/m, needs scale_factor=0.001)
 ETO_ASSET = "projects/climate-engine-pro/assets/ce-ag-era5-v2/daily"  # AgERA5 daily
 ETO_BAND = "ReferenceET_PenmanMonteith_FAO56"  # FAO-56 Penman-Monteith ETo
 ETO_IS_DAILY = True  # AgERA5 is daily data, needs monthly aggregation
@@ -100,6 +100,7 @@ DATASETS = {
         'description': 'ECMWF ERA5-Land ~11km monthly reanalysis',
         'awc_asset': AWC_ASSET,
         'awc_band': AWC_BAND,
+        'awc_scale_factor': 0.001,  # FAO HWSD AWC is in mm/m, convert to volumetric fraction
         'eto_asset': ETO_ASSET,
         'eto_band': ETO_BAND,
         'eto_is_daily': ETO_IS_DAILY,
@@ -113,6 +114,7 @@ DATASETS = {
         'description': 'University of Idaho TerraClimate ~4km monthly',
         'awc_asset': AWC_ASSET,
         'awc_band': AWC_BAND,
+        'awc_scale_factor': 0.001,  # FAO HWSD AWC is in mm/m, convert to volumetric fraction
         'eto_asset': ETO_ASSET,
         'eto_band': ETO_BAND,
         'eto_is_daily': ETO_IS_DAILY,
@@ -293,6 +295,7 @@ def download_usda_scs_rasters(dataset_name: str, skip_if_exists: bool = True, n_
     method_params = {
         'awc_asset': config['awc_asset'],
         'awc_band': config['awc_band'],
+        'awc_scale_factor': config['awc_scale_factor'],
         'eto_asset': config['eto_asset'],
         'eto_band': config['eto_band'],
         'eto_is_daily': config['eto_is_daily'],

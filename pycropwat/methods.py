@@ -354,8 +354,10 @@ def usda_scs_effective_precip(
         Reference evapotranspiration in mm.
     
     awc : np.ndarray
-        Available Water Capacity. For SSURGO data (U.S.), this is in inches
-        (total for 0-152cm profile). For FAO HWSD data (global), this is in mm/m.
+        Available Water Capacity as volumetric fraction (inches/inch or
+        dimensionless). SSURGO data (U.S.) provides this directly. FAO HWSD
+        data (global) is in mm/m and must be divided by 1000 (i.e., apply
+        ``awc_scale_factor=0.001``) before passing to this function.
     
     rooting_depth : float, optional
         Crop rooting depth in meters. Default is 1.0 m.
@@ -598,8 +600,9 @@ def ensemble_effective_precip(
         estimates, use crop evapotranspiration (ETc) instead when available.
     
     awc : np.ndarray
-        Available Water Capacity in inches/inch (volumetric fraction).
-        SSURGO asset provides this directly.
+        Available Water Capacity as volumetric fraction (dimensionless).
+        SSURGO asset provides this directly (inches/inch). FAO HWSD data
+        (mm/m) must be divided by 1000 before passing to this function.
     
     rooting_depth : float, optional
         Crop rooting depth in meters. Default is 1.0 m.

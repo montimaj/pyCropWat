@@ -157,13 +157,14 @@ def cmd_process(args):
         elif args.method == 'usda_scs':
             method_params['awc_asset'] = args.awc_asset
             method_params['awc_band'] = args.awc_band
+            method_params['awc_scale_factor'] = args.awc_scale_factor
             method_params['eto_asset'] = args.eto_asset
             method_params['eto_band'] = args.eto_band
             method_params['eto_is_daily'] = args.eto_is_daily
             method_params['rooting_depth'] = args.rooting_depth
             method_params['mad_factor'] = args.mad_factor
             band_info = f"band: {args.awc_band}" if args.awc_band else "single-band"
-            logger.info(f"AWC Asset: {args.awc_asset} ({band_info})")
+            logger.info(f"AWC Asset: {args.awc_asset} ({band_info}, scale_factor={args.awc_scale_factor})")
             logger.info(f"ETo Asset: {args.eto_asset} (band: {args.eto_band})")
             logger.info(f"Rooting Depth: {args.rooting_depth} m")
             logger.info(f"MAD Factor: {args.mad_factor}")
@@ -175,6 +176,7 @@ def cmd_process(args):
         elif args.method == 'ensemble':
             method_params['awc_asset'] = args.awc_asset
             method_params['awc_band'] = args.awc_band
+            method_params['awc_scale_factor'] = args.awc_scale_factor
             method_params['eto_asset'] = args.eto_asset
             method_params['eto_band'] = args.eto_band
             method_params['eto_is_daily'] = args.eto_is_daily
@@ -183,10 +185,10 @@ def cmd_process(args):
             method_params['percentage'] = args.percentage
             method_params['probability'] = args.probability
             band_info = f"band: {args.awc_band}" if args.awc_band else "single-band"
-            logger.info(f"AWC Asset: {args.awc_asset} ({band_info})")
+            logger.info(f"AWC Asset: {args.awc_asset} ({band_info}, scale_factor={args.awc_scale_factor})")
             logger.info(f"ETo Asset: {args.eto_asset} (band: {args.eto_band})")
             logger.info(f"Rooting Depth: {args.rooting_depth} m")
-            logger.info(f"MAD Factor: {args.mad_factor}")
+            logger.info(f"MAD Factor: {args.mad_factor})"
         
         ep = EffectivePrecipitation(
             asset_id=args.asset,
@@ -551,7 +553,7 @@ def create_parser():
     parser.add_argument(
         '--version',
         action='version',
-        version='%(prog)s 1.2'
+        version='%(prog)s 1.2.1'
     )
     
     parser.add_argument(
@@ -609,6 +611,8 @@ Examples:
                                help='GEE AWC asset for usda_scs/ensemble method. U.S.: projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite, Global: projects/sat-io/open-datasets/FAO/HWSD_V2_SMU')
     process_parser.add_argument('--awc-band', type=str, default=None,
                                help='AWC band name. Omit for SSURGO (single-band), use "AWC" for HWSD')
+    process_parser.add_argument('--awc-scale-factor', type=float, default=1.0,
+                               help='Scale factor for AWC data. FAO HWSD (mm/m): use 0.001 to convert to volumetric fraction. SSURGO: 1.0 (default)')
     process_parser.add_argument('--eto-asset', type=str,
                                help='GEE ETo asset for usda_scs/suet methods. U.S.: projects/openet/assets/reference_et/conus/gridmet/monthly/v1, Global: projects/climate-engine-pro/assets/ce-ag-era5-v2/daily')
     process_parser.add_argument('--eto-band', type=str, default='eto',

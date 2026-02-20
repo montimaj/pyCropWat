@@ -3,7 +3,7 @@
   <img src="assets/pyCropWat_logo.png" alt="pyCropWat Logo" width="200"><br>
 </p>
 
-[![Release](https://img.shields.io/badge/release-v1.2-green.svg)](https://github.com/montimaj/pyCropWat/releases)
+[![Release](https://img.shields.io/badge/release-v1.2.1-green.svg)](https://github.com/montimaj/pyCropWat/releases)
 [![PyPI](https://img.shields.io/pypi/v/pycropwat.svg)](https://pypi.org/project/pycropwat/)
 [![Downloads](https://static.pepy.tech/badge/pycropwat/month)](https://pepy.tech/project/pycropwat)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18201619.svg)](https://doi.org/10.5281/zenodo.18201619)
@@ -162,8 +162,11 @@ The USDA Soil Conservation Service method that accounts for soil water holding c
 
 | Region | Precipitation Asset | AWC Asset | ETo Asset |
 |--------|---------------------|-----------|-----------|
-| **U.S.** | `IDAHO_EPSCOR/GRIDMET` (band: `pr`, daily) | `projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite` | `projects/openet/assets/reference_et/conus/gridmet/monthly/v1` (band: `eto`) |
-| **Global** | `ECMWF/ERA5_LAND/MONTHLY_AGGR` (band: `total_precipitation_sum`) | `projects/sat-io/open-datasets/FAO/HWSD_V2_SMU` (band: `AWC`) | `projects/climate-engine-pro/assets/ce-ag-era5-v2/daily` (band: `ReferenceET_PenmanMonteith_FAO56`) |
+| **U.S.** | `IDAHO_EPSCOR/GRIDMET` (band: `pr`, daily) | `projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite` (volumetric fraction) | `projects/openet/assets/reference_et/conus/gridmet/monthly/v1` (band: `eto`) |
+| **Global** | `ECMWF/ERA5_LAND/MONTHLY_AGGR` (band: `total_precipitation_sum`) | `projects/sat-io/open-datasets/FAO/HWSD_V2_SMU` (band: `AWC`, mm/m) | `projects/climate-engine-pro/assets/ce-ag-era5-v2/daily` (band: `ReferenceET_PenmanMonteith_FAO56`) |
+
+!!! warning "AWC Unit Conversion"
+    FAO HWSD AWC is in **mm/m** and must be converted to volumetric fraction for the USDA-SCS formula. Use `--awc-scale-factor 0.001` (CLI) or `'awc_scale_factor': 0.001` (Python API). SSURGO AWC is already in volumetric fraction (inches/inch) and needs no conversion (default scale factor = 1.0).
 
 **Usage (CLI - U.S.):**
 ```bash
@@ -179,6 +182,7 @@ pycropwat process --asset IDAHO_EPSCOR/GRIDMET --band pr \
 pycropwat process --asset ECMWF/ERA5_LAND/MONTHLY_AGGR --band total_precipitation_sum \
     --method usda_scs \
     --awc-asset projects/sat-io/open-datasets/FAO/HWSD_V2_SMU --awc-band AWC \
+    --awc-scale-factor 0.001 \
     --eto-asset projects/climate-engine-pro/assets/ce-ag-era5-v2/daily \
     --eto-band ReferenceET_PenmanMonteith_FAO56 --eto-is-daily \
     --rooting-depth 1.0 ...
@@ -297,6 +301,7 @@ $$P_{eff}^{ensemble} = \frac{P_{eff}^{cropwat} + P_{eff}^{fao\_aglw} + P_{eff}^{
 ep = EffectivePrecipitation(..., method='ensemble', method_params={
     'awc_asset': 'projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite',
     'awc_band': 'AWC',
+    'awc_scale_factor': 1.0,  # SSURGO is already volumetric fraction; use 0.001 for FAO HWSD (mm/m)
     'eto_asset': 'projects/openet/assets/reference_et/conus/gridmet/monthly/v1',
     'eto_band': 'eto',
     'rooting_depth': 1.0

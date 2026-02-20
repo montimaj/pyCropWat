@@ -226,3 +226,4 @@ Examples/*
 *.pptx
 *.gpkg
 calc*.py
+Examples/wrf

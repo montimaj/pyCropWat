@@ -199,6 +199,11 @@ class EffectivePrecipitation:
               U.S. (GridMET): 'eto', Global (AgERA5): 'ReferenceET_PenmanMonteith_FAO56'
             - ``eto_is_daily`` (bool): Whether ETo is daily. Default False.
               Set True for AgERA5 daily data.
+            - ``awc_scale_factor`` (float): Scale factor for AWC. Default 1.0.
+              FAO HWSD AWC is in mm/m; set to 0.001 to convert to volumetric
+              fraction (required for correct USDA-SCS calculation).
+              SSURGO AWC is already in inches/inch (volumetric fraction),
+              so use 1.0 (default).
             - ``eto_scale_factor`` (float): Scale factor for ETo. Default 1.0.
             - ``rooting_depth`` (float): Rooting depth in meters. Default 1.0.
             - ``mad_factor`` (float): Management Allowed Depletion factor (0-1).
@@ -948,6 +953,8 @@ class EffectivePrecipitation:
         Notes
         -----
         AWC data is loaded from the GEE asset specified in ``method_params['awc_asset']``.
+        A scale factor (``method_params['awc_scale_factor']``) is applied after loading
+        to convert to volumetric fraction. For FAO HWSD data (mm/m), use 0.001.
         If loading fails, a default value of 0.15 (15% AWC) is used.
         
         The AWC data is cached after first load to avoid repeated downloads
@@ -1016,6 +1023,12 @@ class EffectivePrecipitation:
                     band_name='awc', default_value=0.15,
                     target_shape=template_da.shape, data_name="AWC"
                 )
+            
+            # Apply scale factor (e.g., 0.001 for FAO HWSD mm/m -> volumetric fraction)
+            awc_scale_factor = self.method_params.get('awc_scale_factor', 1.0)
+            if awc_scale_factor != 1.0:
+                awc_arr = awc_arr * awc_scale_factor
+                logger.info(f"Applied AWC scale factor: {awc_scale_factor}")
             
             # Cache the result
             self._awc_cache = awc_arr
