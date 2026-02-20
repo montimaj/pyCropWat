@@ -7,10 +7,6 @@ All notable changes to pyCropWat will be documented in this file.
 ### 🔧 Improvements
 - **AWC Scale Factor**: Added `awc_scale_factor` parameter to handle FAO HWSD AWC unit conversion (mm/m → volumetric fraction with `awc_scale_factor=0.001`). SSURGO AWC requires no conversion (default 1.0).
 - CLI: Added `--awc-scale-factor` argument for `usda_scs` and `ensemble` methods.
-
-### 📁 New Files
-- `Examples/wrf/wrf_south_america_example.py` - WRF precipitation effective precipitation workflow for South America
-
 ---
 
 ## [1.2] - 2026-01-23
