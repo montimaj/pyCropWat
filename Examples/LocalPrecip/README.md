@@ -8,6 +8,16 @@ The headline: **precipitation-only methods need no Earth Engine at all.** No `ee
 
 ## The Example Dataset
 
+> [!IMPORTANT]
+> **This dataset is not distributed with pyCropWat.** The ~450 MB of WRF GeoTIFFs live outside the
+> repository and are not on PyPI or GitHub, so a fresh clone will not have them and every script
+> here will exit with `Precipitation directory not found`. Contact the authors if you need access.
+>
+> **You do not need this dataset to use the feature.** Nothing in these scripts is specific to it -
+> point `--precip-dir` at your own monthly rasters and, if their file naming or nodata differs,
+> add `--pattern` / `--nodata`. The table below is the reference for what a working dataset looks
+> like, not a prerequisite.
+
 WRF (Weather Research and Forecasting) regional climate model monthly precipitation totals over the **Rio de la Plata basin domain**, South America.
 
 | Attribute | Value |

@@ -241,5 +241,6 @@ calc*.py
 !Examples/wrf/
 Examples/wrf/*
 !Examples/wrf/*.py
-# ...except the untitled scratch script, which no documentation references.
+# ...except the scratch script and the one-off geeup upload helper, which are not examples
+# and which no documentation references.
 Examples/wrf/test.py
