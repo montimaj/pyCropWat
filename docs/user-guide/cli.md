@@ -15,7 +15,7 @@ pycropwat --list-methods
 
 | Command | Description |
 |---------|-------------|
-| `process` | Calculate effective precipitation from GEE climate data |
+| `process` | Calculate effective precipitation from GEE or local climate data |
 | `aggregate` | Temporal aggregation (annual, seasonal, growing season) |
 | `analyze` | Statistical analysis (anomaly, trend, zonal statistics) |
 | `export` | Export to NetCDF or Cloud-Optimized GeoTIFF |
@@ -25,7 +25,8 @@ pycropwat --list-methods
 
 ## Process Command
 
-Calculate effective precipitation from Google Earth Engine climate data.
+Calculate effective precipitation from Google Earth Engine climate data, or from precipitation
+rasters and NetCDF files you already have on disk (`--local-precip`).
 
 ```bash
 pycropwat process [OPTIONS]
@@ -35,11 +36,21 @@ pycropwat process [OPTIONS]
 
 | Option | Description |
 |--------|-------------|
-| `--asset`, `-a` | GEE ImageCollection asset ID |
-| `--band`, `-b` | Precipitation band name in the asset |
-| `--start-year`, `-s` | Start year for processing (inclusive) |
-| `--end-year`, `-e` | End year for processing (inclusive) |
+| `--asset`, `-a` | GEE ImageCollection asset ID (not required with `--local-precip`, or for `--method pcml`) |
+| `--band`, `-b` | Precipitation band name in the asset (not required with `--local-precip`, or for `--method pcml`) |
+| `--start-year`, `-s` | Start year for processing (inclusive). Not required with `--local-precip` - inferred from the files |
+| `--end-year`, `-e` | End year for processing (inclusive). Not required with `--local-precip` - inferred from the files |
 | `--output`, `-o` | Output directory for GeoTIFF files |
+
+!!! note "`--local-precip` relaxes the required options"
+    When `--local-precip` is given, precipitation comes from disk instead of Earth Engine, so
+    `--asset` and `--band` are not needed (if you pass them anyway they are simply unused).
+    `--start-year`/`--end-year` are optional too: they are inferred from the available files, and a
+    range you do supply is clamped to the years that exist on disk (with a warning). Only
+    `--output` stays mandatory.
+
+    Omitting `--asset`/`--band` **without** `--local-precip` (and without `--method pcml`) exits
+    with `--asset and --band are required (unless --local-precip is given, or --method pcml is used)`.
 
 ### Geometry Options (one required)
 
@@ -47,6 +58,52 @@ pycropwat process [OPTIONS]
 |--------|-------------|
 | `--geometry`, `-g` | Path to local shapefile or GeoJSON |
 | `--gee-geometry`, `-G` | GEE FeatureCollection asset ID |
+
+A geometry is **optional** with `--local-precip` (and for `--method pcml`). With local files and no
+geometry, the extent of the precipitation files is used. With `--geometry` pointing at a local
+vector file, each monthly raster is clipped to it.
+
+### Local Precipitation Options
+
+Use these to read monthly precipitation from disk instead of downloading it from Earth Engine.
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--local-precip` | None | Use local precipitation instead of GEE: a directory of monthly rasters, a NetCDF file, or a glob string. AWC/ETo still come from GEE; precipitation-only methods need no GEE |
+| `--local-precip-pattern` | `*.tif` | Glob used when `--local-precip` is a directory (default: `'*.tif'`) |
+| `--local-precip-variable` | None | NetCDF variable holding precipitation (auto-detected by default) |
+| `--local-precip-nodata` | None | Extra nodata sentinel for local files, e.g. -9999. Applied on top of the value stored in the file metadata |
+| `--local-precip-crs` | None | CRS **override** for local files, e.g. `'EPSG:4326'`. Replaces whatever CRS the files declare (logged at INFO) and supplies one when they declare none. Relabels the grid only - nothing is reprojected |
+| `--local-precip-date-regex` | None | Regex with named groups `'year'` and `'month'` for dating local files, e.g. `'(?P<month>[0-9]{2})_(?P<year>[0-9]{4})'` |
+
+`--scale-factor` is applied to local files as well, so use it to convert your units to millimetres
+per month (e.g. `--scale-factor 1000` for metres). Being a single multiplier, it cannot turn a rate
+such as kg m⁻² s⁻¹ into a monthly total - accumulate those to monthly totals beforehand.
+
+!!! warning "Earth Engine is still used for AWC and ETo"
+    `--method usda_scs`, `--method ensemble` and `--method suet` download AWC and/or ETo from Earth
+    Engine even with `--local-precip`, so they still require GEE credentials. The
+    precipitation-only methods (`cropwat`, `fao_aglw`, `fixed_percentage`, `dependable_rainfall`,
+    `farmwest`) need no Earth Engine at all - it is never initialized.
+
+    `--local-precip` cannot be combined with `--method pcml`; the run exits with
+    `--local-precip cannot be used with --method pcml (PCML is a pre-computed Earth Engine product)`.
+
+    For those three methods, AWC and ETo are downloaded only for the geometry you supply. Any part
+    of the local precipitation grid the download did not cover stays **NaN** in the outputs -
+    pyCropWat does not backfill it - and the run logs a WARNING naming the uncovered pixel count,
+    once per field per process (so `--method usda_scs` and `--method ensemble` log it twice: once
+    for AWC, once for ETo):
+
+    ```
+    AWC covers only 3.0% of the precipitation grid; 534255 pixel(s) will be NaN in the output. Clip the precipitation to the geometry (clip_to_geometry=True) or widen the geometry.
+    ```
+
+    The `clip_to_geometry=True` the message suggests is the Python-API name for what the CLI
+    already does: passing `--geometry` with a local vector file clips the rasters to the downloaded
+    region, which gives full coverage (there is no `--clip-to-geometry` flag, and no way to turn
+    the clipping off from the CLI). A `--gee-geometry` FeatureCollection never clips them, so make
+    sure it spans the whole grid.
 
 ### Optional Parameters
 
@@ -65,6 +122,7 @@ pycropwat process [OPTIONS]
 | `--eto-asset` | None | GEE ETo asset for usda_scs method |
 | `--eto-band` | eto | ETo band name |
 | `--eto-is-daily` | False | Set if ETo asset is daily (aggregates to monthly) |
+| `--eto-scale-factor` | 1.0 | Scale factor for ETo, applied after aggregation. TerraClimate `pet` is stored in 0.1 mm units: use `0.1`. GridMET/AgERA5 ETo is already in mm: `1.0` |
 | `--rooting-depth` | 1.0 | Crop rooting depth in meters for usda_scs |
 | `--mad-factor` | 0.5 | Management Allowed Depletion factor (0-1) for usda_scs |
 | `--sequential` | False | Process sequentially instead of parallel |
@@ -142,6 +200,97 @@ pycropwat process \
     --start-year 2015 --end-year 2020 \
     --method farmwest --output ./output
 ```
+
+#### Local Precipitation Files (No Earth Engine)
+
+Point `--local-precip` at a directory of monthly rasters. With a precipitation-only method
+(`cropwat`, `fao_aglw`, `fixed_percentage`, `dependable_rainfall`, `farmwest`) Earth Engine is never
+initialized, so this runs offline and without credentials:
+
+```bash
+# 264 monthly GeoTIFFs named Precip_YYYY_MM.tif, nodata -9999, already in mm
+pycropwat process \
+    --local-precip ../pyCropWat_Data/Precip \
+    --local-precip-pattern 'Precip_*.tif' \
+    --local-precip-nodata -9999 \
+    --method cropwat \
+    --output ./out_local_cropwat
+```
+
+`--start-year`/`--end-year` were omitted, so the CLI logs
+`Date range: inferred from the local precipitation files` and then the resolved
+`Processing years: 2000 - 2021`. Add them to restrict the run, clip to a region with `--geometry`,
+and select months as usual:
+
+```bash
+pycropwat process \
+    --local-precip ../pyCropWat_Data/Precip \
+    --local-precip-pattern 'Precip_*.tif' \
+    --local-precip-nodata -9999 \
+    --geometry roi.geojson \
+    --start-year 2005 --end-year 2010 \
+    --months 10 11 12 1 2 3 \
+    --method farmwest \
+    --workers 8 \
+    --output ./out_local_farmwest
+```
+
+A NetCDF stack works the same way; name the variable when it cannot be auto-detected, and use
+`--local-precip-crs` to supply a CRS the file lacks or to override one it declares wrongly (it
+relabels the grid, it never reprojects):
+
+```bash
+pycropwat process \
+    --local-precip ./wrf_precip.nc \
+    --local-precip-variable RAINNC \
+    --local-precip-crs EPSG:4326 \
+    --method fao_aglw \
+    --output ./out_local_netcdf
+```
+
+If your file names use a layout the built-in parser does not recognise (`YYYY_MM`, `YYYY-MM`,
+`YYYYMM`, `YYYY.MM`), supply your own regex with `year` and `month` named groups:
+
+```bash
+pycropwat process \
+    --local-precip ./rain \
+    --local-precip-pattern 'rain_*.tif' \
+    --local-precip-date-regex '(?P<month>[0-9]{2})_(?P<year>[0-9]{4})' \
+    --method cropwat \
+    --output ./out_local_regex
+```
+
+#### Local Precipitation with GEE AWC and ETo (Ensemble Method)
+
+`--method ensemble` (and `usda_scs`, `suet`) still pulls AWC and ETo from Earth Engine, so this is a
+hybrid run: precipitation from disk, soil and evaporative demand from GEE. The AWC/ETo grids are
+reprojected onto the local precipitation grid, and any pixel the download did not reach is left NaN
+(see the warning under [Local Precipitation Options](#local-precipitation-options)). The
+`--geometry` below clips the rasters to exactly the downloaded region, so every output pixel has
+precipitation, AWC and ETo:
+
+```bash
+# WRF South America precipitation on disk + FAO HWSD AWC + TerraClimate ETo from GEE
+pycropwat process \
+    --local-precip ../pyCropWat_Data/Precip \
+    --local-precip-pattern 'Precip_*.tif' \
+    --local-precip-nodata -9999 \
+    --geometry riodelaplata.geojson \
+    --start-year 2005 --end-year 2010 \
+    --method ensemble \
+    --awc-asset projects/sat-io/open-datasets/FAO/HWSD_V2_SMU \
+    --awc-band AWC --awc-scale-factor 0.001 \
+    --eto-asset IDAHO_EPSCOR/TERRACLIMATE --eto-band pet --eto-scale-factor 0.1 \
+    --rooting-depth 2.0 --mad-factor 1.0 \
+    --project your-gee-project \
+    --output ./out_local_ensemble
+```
+
+!!! warning "ETo unit scaling"
+    ETo assets are not all stored in millimetres. TerraClimate `pet` is in 0.1 mm units, so it needs
+    `--eto-scale-factor 0.1`; omitting it feeds USDA-SCS an ETo **10x too large** and produces
+    plausible-looking but wrong effective precipitation. GridMET and AgERA5 ETo are already in mm,
+    so they keep the default `1.0`. The example above sets it explicitly for that reason.
 
 #### USDA-SCS Method (U.S. Data)
 

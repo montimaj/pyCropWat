@@ -2,7 +2,7 @@
 Command-line interface for pyCropWat.
 
 Provides subcommands for:
-- process: Calculate effective precipitation from GEE data
+- process: Calculate effective precipitation from GEE data or local files
 - aggregate: Temporal aggregation (seasonal, annual, growing season)
 - analyze: Statistical analysis (anomaly, trend, zonal statistics)
 - export: Export to NetCDF or Cloud-Optimized GeoTIFF
@@ -57,6 +57,62 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _log_local_source(logger, args) -> None:
+    """
+    Log a summary of the local precipitation source before processing.
+
+    Opens the source once to report the number of files, the resolved month
+    count and the year range that will be used. Nothing is logged unless that
+    succeeds: when the source cannot be opened this is a preview that never
+    happened, so it stays silent apart from a debug line, and
+    :class:`~pycropwat.core.EffectivePrecipitation` re-opens the same source a
+    moment later and raises the real error on its own. Announcing the settings
+    first would describe a source that could not be read.
+
+    Parameters
+    ----------
+
+    logger : logging.Logger
+        Logger to write the summary to.
+
+    args : argparse.Namespace
+        Parsed 'process' arguments.
+    """
+    try:
+        from .local import open_local_precipitation
+        
+        with open_local_precipitation(
+            args.local_precip,
+            pattern=args.local_precip_pattern,
+            variable=args.local_precip_variable,
+            scale_factor=args.scale_factor,
+            nodata=args.local_precip_nodata,
+            crs=args.local_precip_crs,
+            date_regex=args.local_precip_date_regex
+        ) as src:
+            first_year, last_year = src.year_range
+            summary = (
+                f"Local precipitation source: kind={src.kind}, files={len(src.files)}, "
+                f"months={len(src)}, years={first_year}-{last_year}, "
+                f"crs={src.crs}, shape={src.shape}"
+            )
+    except Exception as e:
+        logger.debug(f"Could not summarize local precipitation source: {e}")
+        return
+    
+    logger.info(f"Local precipitation: {args.local_precip}")
+    logger.info(f"Local precipitation pattern: {args.local_precip_pattern}")
+    if args.local_precip_variable:
+        logger.info(f"Local precipitation variable: {args.local_precip_variable}")
+    if args.local_precip_nodata is not None:
+        logger.info(f"Local precipitation nodata: {args.local_precip_nodata}")
+    if args.local_precip_crs:
+        logger.info(f"Local precipitation CRS override: {args.local_precip_crs}")
+    if args.local_precip_date_regex:
+        logger.info(f"Local precipitation date regex: {args.local_precip_date_regex}")
+    logger.info(summary)
+
+
 def cmd_process(args):
     """Handle the 'process' subcommand."""
     setup_logging(args.verbose)
@@ -64,9 +120,18 @@ def cmd_process(args):
     
     # Validate arguments
     # Note: PCML method doesn't require asset/band/geometry - it uses the PCML asset defaults
-    if args.method != 'pcml':
+    # Note: --local-precip replaces the GEE precipitation asset entirely
+    use_local = args.local_precip is not None
+    
+    if use_local and args.method == 'pcml':
+        logger.error("--local-precip cannot be used with --method pcml "
+                     "(PCML is a pre-computed Earth Engine product)")
+        sys.exit(1)
+    
+    if args.method != 'pcml' and not use_local:
         if args.asset is None or args.band is None:
-            logger.error("--asset and --band are required (except for PCML method)")
+            logger.error("--asset and --band are required "
+                         "(unless --local-precip is given, or --method pcml is used)")
             sys.exit(1)
         if args.geometry is None and args.gee_geometry is None:
             logger.error("Either --geometry or --gee-geometry must be provided (except for PCML method)")
@@ -78,9 +143,15 @@ def cmd_process(args):
             logger.error(f"Geometry file not found: {args.geometry}")
             sys.exit(1)
     
-    if args.start_year > args.end_year:
-        logger.error("Start year must be less than or equal to end year")
+    if not use_local and (args.start_year is None or args.end_year is None):
+        logger.error("--start-year and --end-year are required "
+                     "(unless --local-precip is given, where they are inferred from the files)")
         sys.exit(1)
+    
+    if args.start_year is not None and args.end_year is not None:
+        if args.start_year > args.end_year:
+            logger.error("Start year must be less than or equal to end year")
+            sys.exit(1)
     
     if args.months:
         invalid_months = [m for m in args.months if m < 1 or m > 12]
@@ -137,8 +208,11 @@ def cmd_process(args):
     
     try:
         logger.info(f"Initializing effective precipitation processor...")
-        logger.info(f"Asset: {args.asset}")
-        logger.info(f"Band: {args.band}")
+        if use_local:
+            _log_local_source(logger, args)
+        else:
+            logger.info(f"Asset: {args.asset}")
+            logger.info(f"Band: {args.band}")
         logger.info(f"Method: {args.method}")
         if args.gee_geometry:
             logger.info(f"GEE Geometry Asset: {args.gee_geometry}")
@@ -146,7 +220,12 @@ def cmd_process(args):
             logger.info(f"Geometry: {args.geometry}")
         elif args.method == 'pcml':
             logger.info(f"Geometry: Using PCML asset's built-in geometry (Western U.S.)")
-        logger.info(f"Date range: {args.start_year} - {args.end_year}")
+        elif use_local:
+            logger.info(f"Geometry: Using the extent of the local precipitation files")
+        if args.start_year is None or args.end_year is None:
+            logger.info(f"Date range: inferred from the local precipitation files")
+        else:
+            logger.info(f"Date range: {args.start_year} - {args.end_year}")
         
         # Build method parameters
         method_params = {}
@@ -161,18 +240,20 @@ def cmd_process(args):
             method_params['eto_asset'] = args.eto_asset
             method_params['eto_band'] = args.eto_band
             method_params['eto_is_daily'] = args.eto_is_daily
+            method_params['eto_scale_factor'] = args.eto_scale_factor
             method_params['rooting_depth'] = args.rooting_depth
             method_params['mad_factor'] = args.mad_factor
             band_info = f"band: {args.awc_band}" if args.awc_band else "single-band"
             logger.info(f"AWC Asset: {args.awc_asset} ({band_info}, scale_factor={args.awc_scale_factor})")
-            logger.info(f"ETo Asset: {args.eto_asset} (band: {args.eto_band})")
+            logger.info(f"ETo Asset: {args.eto_asset} (band: {args.eto_band}, scale_factor={args.eto_scale_factor})")
             logger.info(f"Rooting Depth: {args.rooting_depth} m")
             logger.info(f"MAD Factor: {args.mad_factor}")
         elif args.method == 'suet':
             method_params['eto_asset'] = args.eto_asset
             method_params['eto_band'] = args.eto_band
             method_params['eto_is_daily'] = args.eto_is_daily
-            logger.info(f"ETo Asset: {args.eto_asset} (band: {args.eto_band})")
+            method_params['eto_scale_factor'] = args.eto_scale_factor
+            logger.info(f"ETo Asset: {args.eto_asset} (band: {args.eto_band}, scale_factor={args.eto_scale_factor})")
         elif args.method == 'ensemble':
             method_params['awc_asset'] = args.awc_asset
             method_params['awc_band'] = args.awc_band
@@ -180,13 +261,14 @@ def cmd_process(args):
             method_params['eto_asset'] = args.eto_asset
             method_params['eto_band'] = args.eto_band
             method_params['eto_is_daily'] = args.eto_is_daily
+            method_params['eto_scale_factor'] = args.eto_scale_factor
             method_params['rooting_depth'] = args.rooting_depth
             method_params['mad_factor'] = args.mad_factor
             method_params['percentage'] = args.percentage
             method_params['probability'] = args.probability
             band_info = f"band: {args.awc_band}" if args.awc_band else "single-band"
             logger.info(f"AWC Asset: {args.awc_asset} ({band_info}, scale_factor={args.awc_scale_factor})")
-            logger.info(f"ETo Asset: {args.eto_asset} (band: {args.eto_band})")
+            logger.info(f"ETo Asset: {args.eto_asset} (band: {args.eto_band}, scale_factor={args.eto_scale_factor})")
             logger.info(f"Rooting Depth: {args.rooting_depth} m")
             logger.info(f"MAD Factor: {args.mad_factor}")
         
@@ -201,8 +283,17 @@ def cmd_process(args):
             gee_project=args.project,
             gee_geometry_asset=args.gee_geometry,
             method=args.method,
-            method_params=method_params
+            method_params=method_params,
+            local_precip=args.local_precip,
+            local_precip_pattern=args.local_precip_pattern,
+            local_precip_variable=args.local_precip_variable,
+            local_precip_nodata=args.local_precip_nodata,
+            local_precip_crs=args.local_precip_crs,
+            local_precip_date_regex=args.local_precip_date_regex
         )
+        
+        if use_local:
+            logger.info(f"Processing years: {ep.start_year} - {ep.end_year}")
         
         if args.sequential:
             logger.info("Processing sequentially...")
@@ -553,7 +644,7 @@ def create_parser():
     parser.add_argument(
         '--version',
         action='version',
-        version='%(prog)s 1.2.1'
+        version='%(prog)s 1.3.0'
     )
     
     parser.add_argument(
@@ -569,7 +660,7 @@ def create_parser():
     # =========================================================================
     process_parser = subparsers.add_parser(
         'process',
-        help='Calculate effective precipitation from GEE climate data',
+        help='Calculate effective precipitation from GEE or local climate data',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -587,14 +678,41 @@ Examples:
   # PCML method (Western U.S. only - no asset/band/geometry required)
   pycropwat process --method pcml --start-year 2020 --end-year 2024 \\
                     --output ./WesternUS_PCML --workers 8
+
+  # Local precipitation rasters, no Earth Engine at all
+  # (--start-year/--end-year are inferred from the files when omitted)
+  pycropwat process --local-precip ./Precip --local-precip-pattern 'Precip_*.tif' \\
+                    --local-precip-nodata -9999 --method cropwat --output ./out
+
+  # Local precipitation, AWC and ETo still from Earth Engine
+  pycropwat process --local-precip ./Precip --local-precip-pattern 'Precip_*.tif' \\
+                    --local-precip-nodata -9999 --method ensemble \\
+                    --geometry roi.geojson \\
+                    --awc-asset projects/sat-io/open-datasets/FAO/HWSD_V2_SMU \\
+                    --awc-band AWC --awc-scale-factor 0.001 \\
+                    --eto-asset IDAHO_EPSCOR/TERRACLIMATE --eto-band pet \\
+                    --rooting-depth 2.0 --mad-factor 1.0 \\
+                    --start-year 2005 --end-year 2010 --output ./out
+
+  # Local precipitation from a NetCDF file
+  pycropwat process --local-precip ./wrf_precip.nc --local-precip-variable RAINNC \\
+                    --local-precip-crs EPSG:4326 --method fao_aglw --output ./out
         """
     )
-    process_parser.add_argument('--asset', '-a', help='GEE ImageCollection asset ID (not required for PCML method)')
-    process_parser.add_argument('--band', '-b', help='Precipitation band name (not required for PCML method)')
+    process_parser.add_argument('--asset', '-a',
+                               help='GEE ImageCollection asset ID (not required with --local-precip, '
+                                    'or for the PCML method)')
+    process_parser.add_argument('--band', '-b',
+                               help='Precipitation band name (not required with --local-precip, '
+                                    'or for the PCML method)')
     process_parser.add_argument('--geometry', '-g', type=str, help='Path to shapefile or GeoJSON')
     process_parser.add_argument('--gee-geometry', '-G', type=str, help='GEE FeatureCollection asset ID')
-    process_parser.add_argument('--start-year', '-s', required=True, type=int, help='Start year')
-    process_parser.add_argument('--end-year', '-e', required=True, type=int, help='End year')
+    process_parser.add_argument('--start-year', '-s', type=int,
+                               help='Start year (required unless --local-precip is given, '
+                                    'where it is inferred from the files)')
+    process_parser.add_argument('--end-year', '-e', type=int,
+                               help='End year (required unless --local-precip is given, '
+                                    'where it is inferred from the files)')
     process_parser.add_argument('--output', '-o', required=True, type=Path, help='Output directory')
     process_parser.add_argument('--scale-factor', '-f', type=float, default=1.0, help='Precipitation scale factor')
     process_parser.add_argument('--scale', '-r', type=float, help='Output resolution in meters')
@@ -619,10 +737,35 @@ Examples:
                                help='ETo band name. GridMET: "eto", ERA5: "ReferenceET_PenmanMonteith_FAO56"')
     process_parser.add_argument('--eto-is-daily', action='store_true',
                                help='Set if ETo asset is daily (will aggregate to monthly)')
+    process_parser.add_argument('--eto-scale-factor', type=float, default=1.0,
+                               help='Scale factor for ETo data, applied after aggregation. '
+                                    'TerraClimate "pet" is stored in 0.1 mm units: use 0.1. '
+                                    'GridMET/AgERA5 ETo is already in mm: 1.0 (default)')
     process_parser.add_argument('--rooting-depth', type=float, default=1.0,
                                help='Crop rooting depth in meters for usda_scs method (default: 1.0)')
     process_parser.add_argument('--mad-factor', type=float, default=0.5,
                                help='Management Allowed Depletion factor (0-1) for usda_scs method (default: 0.5)')
+    # Local precipitation input (replaces the GEE precipitation asset)
+    process_parser.add_argument('--local-precip', type=str, default=None,
+                               help='Use local precipitation instead of GEE: a directory of '
+                                    'monthly rasters, a NetCDF file, or a glob string. AWC/ETo '
+                                    'still come from GEE; precipitation-only methods need no GEE')
+    process_parser.add_argument('--local-precip-pattern', type=str, default='*.tif',
+                               help="Glob used when --local-precip is a directory "
+                                    "(default: '*.tif')")
+    process_parser.add_argument('--local-precip-variable', type=str, default=None,
+                               help='NetCDF variable holding precipitation '
+                                    '(auto-detected by default)')
+    process_parser.add_argument('--local-precip-nodata', type=float, default=None,
+                               help='Extra nodata sentinel for local files, e.g. -9999. Applied on '
+                                    'top of the value stored in the file metadata')
+    process_parser.add_argument('--local-precip-crs', type=str, default=None,
+                               help="CRS override for local files, e.g. 'EPSG:4326'. Replaces any "
+                                    "CRS the files declare and supplies one when they declare "
+                                    "none. Relabels the grid only - never reprojects")
+    process_parser.add_argument('--local-precip-date-regex', type=str, default=None,
+                               help="Regex with named groups 'year' and 'month' for dating local "
+                                    "files, e.g. '(?P<month>[0-9]{2})_(?P<year>[0-9]{4})'")
     process_parser.add_argument('--sequential', action='store_true', help='Process sequentially')
     add_common_args(process_parser)
     process_parser.set_defaults(func=cmd_process)

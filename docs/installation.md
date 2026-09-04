@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Python 3.9 or higher
+- Python 3.10 or higher
 - Google Earth Engine account with authenticated access
 
 ## Install with pip

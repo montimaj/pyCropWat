@@ -2,6 +2,152 @@
 
 All notable changes to pyCropWat will be documented in this file.
 
+## [1.3.0] - 2026-09-04
+
+### ✨ Added
+- **Local Precipitation Input**: effective precipitation can now be computed from **your own**
+  precipitation rasters instead of Google Earth Engine. New module `pycropwat/local.py`:
+  - `LocalPrecipitationSource` - indexed, lazily-read source for a directory of monthly rasters, a
+    glob string, or one/many NetCDF files. Properties: `kind`, `files`, `crs`, `bounds`,
+    `native_bounds`, `year_range`, `resolution`, `shape`; methods: `available_months()`,
+    `has_month()`, `get_month()`, `close()`; also a context manager with `__len__`/`__repr__`
+  - `open_local_precipitation(path, **kwargs)` - convenience factory
+  - `parse_year_month(name, date_regex=None)` - dates a file name using the `YYYY_MM`, `YYYY-MM`,
+    `YYYYMM` and `YYYY.MM` layouts, or a custom regex with named `year`/`month` groups
+  - Monthly grids are returned as 2-D `('y', 'x')` `float32` DataArrays in mm, north-up, nodata as
+    NaN, with the source CRS attached
+- **New `EffectivePrecipitation` arguments** (all appended after the existing ones, so positional
+  and keyword calls stay backward compatible): `local_precip`, `local_precip_pattern` (default
+  `'*.tif'`), `local_precip_variable`, `local_precip_nodata`, `local_precip_crs`,
+  `local_precip_date_regex`, `clip_to_geometry` (default `True`)
+- **New CLI flags** on `pycropwat process`: `--local-precip`, `--local-precip-pattern`,
+  `--local-precip-variable`, `--local-precip-nodata`, `--local-precip-date-regex` and
+  `--local-precip-crs`, plus three new examples in the `process` help epilog (local rasters with no
+  Earth Engine, local rasters with GEE AWC/ETo, and a local NetCDF file)
+- **`--eto-scale-factor`** on `pycropwat process` (default `1.0`), the ETo counterpart to the
+  existing `--awc-scale-factor`. It is passed to the `usda_scs`, `suet` and `ensemble` methods.
+  Previously `eto_scale_factor` could only be set through the Python API's `method_params`, so any
+  documented CLI command using TerraClimate `pet` (stored in 0.1 mm units) silently ran USDA-SCS
+  with an ETo 10x too large - measured at 1.70x the mean and 5.3x the maximum effective
+  precipitation. The affected commands in the docs now pass `--eto-scale-factor 0.1`
+- **Lazy Earth Engine initialization**: `ee.Initialize()` is only called when something actually
+  needs it. Local precipitation with a precipitation-only method (`cropwat`, `fao_aglw`,
+  `fixed_percentage`, `dependable_rainfall`, `farmwest`) needs **no Earth Engine at all** and runs
+  offline; `self.geometry` and `self.collection` are then `None`
+- **Year inference and month filtering**: `start_year`/`end_year` are inferred from the local files
+  when omitted, a supplied range is clamped to the available years (with a warning), and requested
+  months with no file are skipped and reported instead of failing
+- **Geometry is optional with local precipitation**: with no geometry the extent of the local files
+  is used; a local vector `geometry_path` clips each monthly raster (`clip_to_geometry=True`)
+- **`local_precip_crs` / `--local-precip-crs` is an override**: it replaces whatever CRS the local
+  files declare, and supplies one when they declare none. Replacing a declared CRS is logged at
+  INFO. It relabels the grid in place - values and transform are untouched - and never reprojects
+- **AWC/ETo regridding for local grids**: GEE-sourced AWC and ETo are reprojected onto the local
+  precipitation grid with `reproject_match()` (falling back to the previous zoom behaviour on
+  error), and the local grid resolution is used as the GEE download scale. Pixels of the local grid
+  that the download never covered stay **NaN** and propagate to NaN in the `usda_scs`, `ensemble`
+  and `suet` outputs; the run logs a warning naming the uncovered fraction, once per field per
+  process (so two lines for `usda_scs`/`ensemble`: one for AWC, one for ETo). pyCropWat does not
+  substitute a filler value for a region it never downloaded
+- **Works under `dask.distributed`**: `EffectivePrecipitation` is now picklable, so
+  `process()` runs under a `Client`/`LocalCluster` with worker **processes**. Earth Engine is
+  re-initialized inside each worker (its state is process-local), and the local source handle and
+  its lock are rebuilt on unpickle rather than being serialized
+- **Grid validation for local files**: CRS, shape and transform are checked across the whole
+  directory when the index is built (metadata only - indexing 264 rasters takes ~0.12 s). A
+  mismatched file raises an error naming it and how it differs, instead of silently producing a
+  time series on inconsistent grids. With `local_precip_crs` set, a directory whose files *declare*
+  different CRSs still warns
+- **2-D curvilinear coordinates**: WRF-style NetCDF files are read whether their 2-D `XLAT`/`XLONG`
+  arrays are promoted by a CF `coordinates` attribute or left as plain data variables, and are
+  collapsed to 1-D when the grid is regular enough; a genuinely curvilinear grid raises rather than
+  returning a wrong one
+- `Examples/LocalPrecip/` - `local_precip_quickstart.py`, `wrf_south_america_local_example.py`
+  (the local-file counterpart of `Examples/wrf/wrf_south_america_example.py`) and
+  `local_netcdf_example.py`, with their own README
+- `docs/user-guide/local-data.md` guide and `docs/api/local.md` API page, both added to the
+  `mkdocs.yml` nav
+- `tests/test_local.py` - tests for the local precipitation source
+
+### 🔧 Changed
+- `asset_id` and `precip_band` are now `Optional[str] = None`; they are required only when
+  `local_precip` is not given and the method is not `pcml`. Omitting a precipitation source raises
+  `ValueError("No precipitation source provided...")`
+- CLI: `--start-year`/`--end-year` are no longer `required=True` (inferred from the files with
+  `--local-precip`), and the `--asset`/`--band` check now reads
+  `--asset and --band are required (unless --local-precip is given, or --method pcml is used)`
+- New exports from `pycropwat`: `LocalPrecipitationSource`, `open_local_precipitation`,
+  `parse_year_month`
+- Output rasters are written with the CRS of the precipitation grid instead of a hard-coded
+  `EPSG:4326`, so local grids in any projection round-trip correctly (no change for GEE runs, which
+  are always EPSG:4326)
+- `--local-precip` is rejected with `--method pcml` (PCML is a pre-computed Earth Engine product)
+- Version bumped to 1.3.0 (`pycropwat/__init__.py`, `pyproject.toml`, `pycropwat --version`)
+
+### 🐛 Fixes
+- **NaN precipitation no longer reports a zero effective precipitation fraction**: nodata pixels now
+  propagate as NaN to both `effective_precip_*.tif` and `effective_precip_fraction_*.tif`, the
+  arithmetic runs under `np.errstate(divide='ignore', invalid='ignore')`, and NaN is declared as the
+  raster nodata value. GEE downloads never produce NaN, so GEE outputs are unchanged
+- Removed duplicate `'usda_scs'` and `'suet'` entries from the method list in the `pycropwat`
+  package docstring
+- Added the missing `suet_effective_precip`, `pcml_effective_precip` and `ensemble_effective_precip`
+  exports to `pycropwat.__all__` (previously importable only from `pycropwat.methods`)
+- CLI: the `--local-precip` summary no longer announces the source settings before it has managed to
+  open the source. A source that cannot be read is now silent (debug only) instead of printing five
+  INFO lines and a warning that merely duplicated the real error raised moments later
+- **`TemporalAggregator` no longer turns nodata into 0 mm.** `sum`/`mean`/`min`/`max`/`std` use
+  xarray's `skipna=True`, so a pixel that was NaN in *every* contributing month aggregated to
+  exactly `0.0` and the result was written with no nodata value - making ocean and outside-domain
+  pixels indistinguishable from genuinely dry land in annual, seasonal, growing-season, custom and
+  climatology products, and via `pycropwat aggregate`. Such pixels now stay NaN and every aggregate
+  declares `nodata=NaN`. A pixel missing only *some* months still aggregates over what exists, as
+  before. This was unreachable before 1.3.0 because GEE downloads use `defaultValue=0` and never
+  produced NaN; pixel values for NaN-free inputs are unchanged, only the nodata tag is new
+- `StatisticalAnalyzer.calculate_anomaly` and `.calculate_trend` now declare `nodata=NaN` on their
+  outputs too, matching the aggregator instead of writing untagged NaN rasters
+- An Earth Engine authentication or initialization failure is no longer swallowed by the AWC/ETo
+  fallback and silently reported as `0.15` / `100 mm`. It now propagates; the constant fallback is
+  kept only for its original case - an asset that genuinely has no data over the region - and still
+  logs at WARNING
+- Suppressed two `RuntimeWarning`s raised by all-NaN pixels that had no way to occur before local
+  nodata existed: `Mean of empty slice` from the `ensemble` method, and
+  `Degrees of freedom <= 0 for slice` from the `std` aggregation and standardized anomalies
+- Constructing `EffectivePrecipitation` without a usable precipitation source now reports which
+  piece is missing - a missing `precip_band` names the asset and suggests a band for it, rather
+  than claiming no source was provided at all
+- Docs: `zonal_statistics(zones_path=...)` corrected to `geometry_path=...`,
+  `multi_year_climatology()` no longer shown with a non-existent `method=` argument, USDA-SCS
+  keywords moved inside `method_params` where several examples had them at top level, and the
+  unresolvable `LICENSE` link and dead New Mexico anchor in `docs/index.md` fixed. All pre-existing
+  since before 1.3.0
+
+### 📚 Documentation
+- New "Local Precipitation Data" user guide and API reference page
+- Quick Start, CLI Reference, Python API, Examples and `Examples/README.md` updated for local
+  precipitation input
+- `--asset`/`--band` help now says they are not required with `--local-precip` either, not just for
+  `--method pcml`
+- Documented that `precip_scale_factor` is a single multiplier and so cannot convert a rate such as
+  kg m⁻² s⁻¹ to a monthly total (the factor depends on the length of each month); `docs/examples.md`
+  no longer suggests `86400` for that case
+
+### 🏗️ Packaging
+- **Minimum Python is now 3.10** (was 3.9). `requires-python`, the PyPI classifiers, the Black
+  `target-version`, `environment.yml` and the documented requirements were updated together.
+  Python 3.9 reached end of life in October 2025. No source change was needed - the codebase
+  already avoided 3.10-only syntax - so 1.3.0 still runs on 3.9 if installed from source; the
+  bound simply stops pip resolving it there
+- `.gitignore`: `Examples/*` excluded the `Examples/LocalPrecip/` directory itself, and git cannot
+  re-include a file whose parent directory is excluded, so the new example scripts and their README
+  could never be committed. The directory is now re-included before its `*.py`/`*.md` contents,
+  while the generated output directories (Peff/AWC/ETo GeoTIFFs, NetCDF stacks) stay ignored
+- `.gitignore`: `Examples/wrf/` was ignored wholesale, which also hid the example scripts the docs
+  link to. Its `*.py` files are now tracked (except the untitled `test.py` scratch script) while the
+  ~7 GB of WRF/ERA5/AgERA5 inputs and `peff_ensemble/` outputs stay ignored
+
+---
+
 ## [1.2.1] - 2026-02-19
 
 ### 🔧 Improvements

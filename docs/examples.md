@@ -336,7 +336,7 @@ trend_sen = stats.calculate_trend(
 
 # Zonal statistics by administrative region
 zonal_df = stats.zonal_statistics(
-    zones_path='./admin_regions.shp',
+    geometry_path='./admin_regions.shp',
     start_year=2010,
     end_year=2020,
     stats=['mean', 'sum', 'min', 'max', 'std'],
@@ -382,7 +382,7 @@ from pathlib import Path
 export_to_netcdf(
     input_dir='./outputs',
     output_path='./effective_precip.nc',
-    variable='effective_precip',
+    variable_name='effective_precip',
     pattern='effective_precip_[0-9]*.tif',  # Excludes fraction files
     compression=True
 )
@@ -463,7 +463,7 @@ viz.plot_interactive_map(
     month=6,
     cmap='YlGnBu',
     opacity=0.7,
-    basemap='OpenStreetMap',
+    zoom_start=6,
     output_path='./interactive_map.html'
 )
 
@@ -561,11 +561,10 @@ viz = Visualizer('./era5_outputs')
 
 # Side-by-side comparison with difference map
 fig = viz.plot_comparison(
-    other_input_dir='./terraclimate_outputs',
+    other_dir='./terraclimate_outputs',
     year=2020,
     month=6,
-    label1='ERA5-Land',
-    label2='TerraClimate',
+    labels=('ERA5-Land', 'TerraClimate'),
     cmap='YlGnBu',
     diff_cmap='RdBu',
     output_path='./comparison_2020_06.png'
@@ -573,22 +572,20 @@ fig = viz.plot_comparison(
 
 # Scatter plot with statistics (R², RMSE, bias)
 fig = viz.plot_scatter_comparison(
-    other_input_dir='./terraclimate_outputs',
+    other_dir='./terraclimate_outputs',
     start_year=2000,
     end_year=2020,
     sample_size=10000,
-    label1='ERA5-Land (mm)',
-    label2='TerraClimate (mm)',
+    labels=('ERA5-Land (mm)', 'TerraClimate (mm)'),
     output_path='./scatter_comparison.png'
 )
 
 # Annual totals comparison
 fig = viz.plot_annual_comparison(
-    other_input_dir='./terraclimate_outputs',
+    other_dir='./terraclimate_outputs',
     start_year=2000,
     end_year=2020,
-    label1='ERA5-Land',
-    label2='TerraClimate',
+    labels=('ERA5-Land', 'TerraClimate'),
     output_path='./annual_comparison.png'
 )
 ```
@@ -768,7 +765,7 @@ stats.calculate_trend(1990, 2023, method='sen', output_dir='./trend/')
 
 # Zonal statistics
 zonal_df = stats.zonal_statistics(
-    zones_path='./admin_regions.shp',
+    geometry_path='./admin_regions.shp',
     start_year=1990,
     end_year=2023,
     output_path='./zonal_stats.csv'
@@ -923,11 +920,13 @@ ep = EffectivePrecipitation(
     scale=4000,  # 4km resolution
     # USDA-SCS specific parameters
     method='usda_scs',
-    awc_asset='projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite',
-    eto_asset='projects/openet/assets/reference_et/conus/gridmet/monthly/v1',
-    eto_band='eto',
-    rooting_depth=1.0,  # 1 meter
-    mad_factor=0.5  # Management Allowed Depletion factor
+    method_params={
+        'awc_asset': 'projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite',
+        'eto_asset': 'projects/openet/assets/reference_et/conus/gridmet/monthly/v1',
+        'eto_band': 'eto',
+        'rooting_depth': 1.0,  # 1 meter
+        'mad_factor': 0.5  # Management Allowed Depletion factor
+    }
 )
 
 ep.process(output_dir='./Arizona/AZ_GridMET_USDA_SCS', n_workers=8)
@@ -1089,7 +1088,8 @@ from pycropwat.methods import (
     dependable_rainfall_effective_precip,
     farmwest_effective_precip,
     usda_scs_effective_precip,
-    suet_effective_precip
+    suet_effective_precip,
+    ensemble_effective_precip
 )
 import rioxarray
 import numpy as np
@@ -1103,9 +1103,11 @@ ep = EffectivePrecipitation(
     end_year=2025,
     scale=800,
     method='usda_scs',
-    awc_asset='projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite',
-    eto_asset='projects/openet/assets/reference_et/conus/gridmet/monthly/v1',
-    eto_band='eto'
+    method_params={
+        'awc_asset': 'projects/openet/soil/ssurgo_AWC_WTA_0to152cm_composite',
+        'eto_asset': 'projects/openet/assets/reference_et/conus/gridmet/monthly/v1',
+        'eto_band': 'eto'
+    }
 )
 ep.process(output_dir='./NewMexico/NM_PRISM_USDA_SCS', n_workers=4)
 
@@ -1121,7 +1123,7 @@ methods = {
     'fixed_percentage': fixed_percentage_effective_precip(precip, 0.7),
     'dependable_rainfall': dependable_rainfall_effective_precip(precip, 0.75),
     'farmwest': farmwest_effective_precip(precip),
-    'usda_scs': usda_scs_effective_precip(precip, awc, eto),
+    'usda_scs': usda_scs_effective_precip(precip, eto, awc),
     'suet': suet_effective_precip(precip, eto),
     'ensemble': ensemble_effective_precip(precip, eto, awc)
 }
@@ -2405,3 +2407,410 @@ The PCML example script (`western_us_pcml_example.py`) produces water year analy
 *Mean annual effective precipitation fraction (Peff/Precip) for the Western United States (WY 2001-2024).*
 
 **Reference:** Hasan, M. F., Smith, R. G., Majumdar, S., Huntington, J. L., Alves Meira Neto, A., & Minor, B. A. (2025). Satellite data and physics-constrained machine learning for estimating effective precipitation in the Western United States and application for monitoring groundwater irrigation. *Agricultural Water Management*, 319, 109821.
+
+---
+
+## Local Precipitation Examples (Your Own Files)
+
+Since v1.3.0 pyCropWat can read monthly precipitation from disk instead of downloading it from Earth
+Engine. Three ready-to-run scripts live in [`Examples/LocalPrecip/`](https://github.com/montimaj/pyCropWat/tree/main/Examples/LocalPrecip)
+(see [`Examples/LocalPrecip/README.md`](https://github.com/montimaj/pyCropWat/blob/main/Examples/LocalPrecip/README.md)
+for the full option list), and the [Local Precipitation Data](user-guide/local-data.md) guide covers
+the feature end-to-end.
+
+| Script | Input | Method | Earth Engine |
+|--------|-------|--------|--------------|
+| `local_precip_quickstart.py` | Directory of monthly GeoTIFFs | `cropwat` (any precipitation-only method) | Not used |
+| `wrf_south_america_local_example.py` | WRF South America GeoTIFFs + GEE AWC/ETo | `usda_scs`, then all 8 methods locally | AWC and ETo only |
+| `local_netcdf_example.py` | NetCDF stack built from the same GeoTIFFs | `cropwat` (any precipitation-only method) | Not used |
+
+All three expect the WRF South America example rasters at `<repo>/../pyCropWat_Data/Precip`, and all
+three take `--precip-dir` to point at your own monthly rasters instead.
+
+---
+
+## Local Precipitation Quick Start
+
+The smallest possible local-data workflow: a directory of monthly rasters in, effective
+precipitation rasters out, with **no Earth Engine involvement at all**.
+
+!!! tip "Ready-to-Run Script"
+    [`Examples/LocalPrecip/local_precip_quickstart.py`](https://github.com/montimaj/pyCropWat/blob/main/Examples/LocalPrecip/local_precip_quickstart.py):
+
+    ```bash
+    python Examples/LocalPrecip/local_precip_quickstart.py
+    ```
+
+    Defaults keep the first run small: `--method cropwat`, `--start-year 2005 --end-year 2005`,
+    `--months 7 8`, four workers, output in `./LocalPrecip_Quickstart`.
+
+### Input Data
+
+| Property | Value |
+|----------|-------|
+| **Layout** | One GeoTIFF per month, dated by file name (`Precip_YYYY_MM.tif`) |
+| **Units** | Monthly totals; convert with `precip_scale_factor` if not already mm |
+| **Nodata** | Read from the file metadata, plus any extra sentinel you pass (e.g. `-9999`) |
+| **CRS** | Read from the file. `local_precip_crs` **overrides** it (and supplies one when the file declares none) - it relabels the grid, it never reprojects |
+
+Recognised file-name layouts are `YYYY_MM`, `YYYY-MM`, `YYYYMM` and `YYYY.MM`. Anything else needs
+`local_precip_date_regex` with named `year` and `month` groups.
+
+### Script Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--precip-dir` | `<repo>/../pyCropWat_Data/Precip` | Directory of monthly precipitation GeoTIFFs |
+| `--pattern` | `Precip_*.tif` | Glob for the monthly rasters |
+| `--nodata` | `-9999.0` | Extra nodata sentinel, on top of the file metadata |
+| `--method` | `cropwat` | Any precipitation-only method (`cropwat`, `fao_aglw`, `fixed_percentage`, `dependable_rainfall`, `farmwest`) |
+| `--start-year` / `--end-year` | `2005` / `2005` | Period to process |
+| `--months` | `7 8` | Months to process |
+| `--output` | `./LocalPrecip_Quickstart` | Output directory |
+| `-w`, `--workers` | `4` | Parallel workers; `1` runs `process_sequential()` |
+
+The script first opens the data with `open_local_precipitation()` and logs the resolved kind, file
+count, month count, year range, CRS, grid shape, resolution and WGS84 bounds, then runs the
+workflow and reports min/mean/max and the NaN count of the first output raster.
+
+### Python Example
+
+```python
+from pycropwat import EffectivePrecipitation
+
+ep = EffectivePrecipitation(
+    local_precip='../pyCropWat_Data/Precip',
+    local_precip_pattern='Precip_*.tif',
+    local_precip_nodata=-9999,
+    method='cropwat'
+)
+
+# start_year/end_year omitted -> inferred from the files (2000-2021 for this dataset)
+results = ep.process(output_dir='./out_local_cropwat', n_workers=4)
+
+for ep_path, epf_path in results[:3]:
+    print(ep_path.name, epf_path.name)
+```
+
+### CLI Example
+
+```bash
+pycropwat process \
+    --local-precip ../pyCropWat_Data/Precip \
+    --local-precip-pattern 'Precip_*.tif' \
+    --local-precip-nodata -9999 \
+    --method cropwat \
+    --output ./out_local_cropwat
+```
+
+### Key Features
+
+- **No Earth Engine**: `ee.Initialize()` is never called for precipitation-only methods, so the run
+  works offline and without credentials
+- **Automatic date range**: `start_year`/`end_year` are inferred from the file names; a range you do
+  supply is clamped to the years on disk (with a warning), and months with no file are skipped
+- **Nodata preserved**: `-9999` pixels become `NaN` and stay `NaN` in both the effective
+  precipitation and the fraction raster (they are not reported as a fraction of 0)
+- **Same outputs as GEE runs**: `effective_precip_YYYY_MM.tif` and
+  `effective_precip_fraction_YYYY_MM.tif`, written on the input grid and CRS
+
+### Generated Outputs
+
+```
+LocalPrecip_Quickstart/
+├── effective_precip_2005_07.tif
+├── effective_precip_fraction_2005_07.tif
+├── effective_precip_2005_08.tif
+└── effective_precip_fraction_2005_08.tif
+```
+
+All downstream tooling (`TemporalAggregator`, `StatisticalAnalyzer`, `Visualizer`,
+`export_to_netcdf`) works on these exactly as it does for GEE-derived outputs.
+
+---
+
+## WRF South America Local Precipitation Example
+
+This example runs the Rio de la Plata basin workflow from **WRF regional climate model
+precipitation stored on disk**, while still pulling AWC and ETo from Earth Engine so that the
+`usda_scs` and `ensemble` methods are available. It mirrors the two-step design of the GEE
+examples: run USDA-SCS once with `save_inputs=True`, then calculate the remaining methods locally
+from the saved precipitation, AWC and ETo rasters.
+
+!!! tip "Ready-to-Run Script"
+    [`Examples/LocalPrecip/wrf_south_america_local_example.py`](https://github.com/montimaj/pyCropWat/blob/main/Examples/LocalPrecip/wrf_south_america_local_example.py):
+
+    ```bash
+    # Default period is 2000-2001 (24 months) so the first run is quick
+    python Examples/LocalPrecip/wrf_south_america_local_example.py
+
+    # The full WRF record
+    python Examples/LocalPrecip/wrf_south_america_local_example.py \
+        --start-year 2000 --end-year 2021 -w 8
+    ```
+
+    Other options: `--precip-dir`, `--pattern`, `--nodata`, `--geometry` (local vector file or GEE
+    FeatureCollection asset), `--gee-project`, `--output` (default `./WRF_SA_Local`),
+    `--download-only`, `--calc-only` and `-f`/`--force`.
+
+!!! note "Local counterpart of the GEE WRF workflow"
+    This is the local-file twin of
+    [`Examples/wrf/wrf_south_america_example.py`](https://github.com/montimaj/pyCropWat/blob/main/Examples/wrf/wrf_south_america_example.py),
+    which computes the same thing from the WRF precipitation **GEE asset**
+    (`projects/azhydro/assets/WRF-ET-SA`, band `b1`). Same domain, same period, same AWC/ETo assets,
+    same rooting depth and MAD factor, same output layout - the only difference is where the
+    precipitation comes from. Run both to compare a GEE-hosted ingestion against reading the
+    exported rasters directly.
+
+### WRF Precipitation Dataset
+
+| Property | Value |
+|----------|-------|
+| **Source** | WRF regional climate model output, South America (Rio de la Plata basin domain) |
+| **Files** | 264 monthly GeoTIFFs named `Precip_YYYY_MM.tif` |
+| **Period** | January 2000 - December 2021 |
+| **CRS** | EPSG:4326 |
+| **Grid** | 689 rows x 799 columns at 0.0397 deg (~4.4 km) |
+| **Extent** | 71.30°W - 39.54°W, 40.35°S - 12.96°S |
+| **Values** | `float32`, already in millimetres per month (`precip_scale_factor=1.0`), nodata `-9999` |
+
+### AWC and ETo (still from Earth Engine)
+
+| Component | GEE Asset | Band | Scaling |
+|-----------|-----------|------|---------|
+| **AWC** | `projects/sat-io/open-datasets/FAO/HWSD_V2_SMU` | `AWC` | `awc_scale_factor=0.001` (mm/m → volumetric fraction) |
+| **ETo** | `IDAHO_EPSCOR/TERRACLIMATE` | `pet` | `eto_scale_factor=0.1`, `eto_is_daily=False` |
+
+Physical parameters: `rooting_depth=2.0` m, `mad_factor=1.0`. Because AWC and ETo are downloaded,
+this example **does** require Earth Engine credentials.
+
+### Methods Computed (8 total)
+
+| # | Method | Inputs |
+|---|--------|--------|
+| 1 | USDA-SCS | Local precipitation + GEE AWC + GEE ETo |
+| 2 | Ensemble | Mean of 6 methods, calculated locally |
+| 3 | CROPWAT | Precipitation only |
+| 4 | FAO/AGLW | Precipitation only |
+| 5 | Fixed % (70%) | Precipitation only |
+| 6 | Dependable Rainfall (75%) | Precipitation only |
+| 7 | FarmWest | Precipitation only |
+| 8 | TAGEM-SuET | Local precipitation + saved ETo |
+
+PCML is excluded: it is a pre-computed Western U.S. GEE product and cannot be combined with local
+precipitation.
+
+### Python Example
+
+```python
+from pycropwat import EffectivePrecipitation
+
+ep = EffectivePrecipitation(
+    local_precip='../pyCropWat_Data/Precip',
+    local_precip_pattern='Precip_*.tif',
+    local_precip_nodata=-9999,
+    geometry_path=None,                 # optional: a vector file clips the local rasters
+    start_year=2000,
+    end_year=2001,
+    precip_scale_factor=1.0,            # WRF rasters are already in mm
+    gee_project='your-project-id',
+    method='usda_scs',
+    method_params={
+        'awc_asset': 'projects/sat-io/open-datasets/FAO/HWSD_V2_SMU',
+        'awc_band': 'AWC',
+        'awc_scale_factor': 0.001,
+        'eto_asset': 'IDAHO_EPSCOR/TERRACLIMATE',
+        'eto_band': 'pet',
+        'eto_scale_factor': 0.1,
+        'eto_is_daily': False,
+        'rooting_depth': 2.0,
+        'mad_factor': 1.0
+    }
+)
+
+# save_inputs writes precip_YYYY_MM.tif, awc.tif and eto_YYYY_MM.tif into input_dir
+ep.process(
+    output_dir='./WRF_SA_Local/usda_scs',
+    input_dir='./WRF_SA_Local/analysis_inputs',
+    n_workers=4,
+    save_inputs=True
+)
+```
+
+Step 2 of the script then reads those saved rasters back with `rioxarray` and applies the other
+seven methods from `pycropwat.methods` - no further downloads required. Use `--download-only` to
+stop after step 1, or `--calc-only` to re-run step 2 on inputs you already have.
+
+### CLI Example
+
+```bash
+pycropwat process \
+    --local-precip ../pyCropWat_Data/Precip \
+    --local-precip-pattern 'Precip_*.tif' \
+    --local-precip-nodata -9999 \
+    --start-year 2000 --end-year 2001 \
+    --method usda_scs \
+    --awc-asset projects/sat-io/open-datasets/FAO/HWSD_V2_SMU \
+    --awc-band AWC --awc-scale-factor 0.001 \
+    --eto-asset IDAHO_EPSCOR/TERRACLIMATE --eto-band pet --eto-scale-factor 0.1 \
+    --rooting-depth 2.0 --mad-factor 1.0 \
+    --project your-project-id \
+    --workers 8 \
+    --output ./WRF_SA_Local/usda_scs
+```
+
+!!! warning "ETo unit scaling"
+    TerraClimate `pet` is stored in 0.1 mm units, so `--eto-scale-factor 0.1` is required above.
+    Omitting it feeds USDA-SCS an ETo 10x too large and yields plausible-looking but wrong results.
+    GridMET and AgERA5 ETo are already in mm and keep the default `1.0`. The Python API equivalent
+    is `method_params={'eto_scale_factor': 0.1}`.
+
+### Key Features
+
+- **Hybrid workflow**: precipitation from disk, AWC and ETo from Earth Engine
+- **Grid alignment**: GEE-sourced AWC and ETo are reprojected onto the local WRF grid, so the saved
+  `awc.tif`/`eto_YYYY_MM.tif` share the transform and CRS of `precip_YYYY_MM.tif`
+- **Native scale**: the local grid resolution (~4.4 km) is used as the GEE download scale for
+  AWC/ETo instead of the generic fallback
+- **Model-domain nodata**: the WRF `-9999` border is masked to `NaN` and stays masked in every output
+- **Optional clipping**: `--geometry` with a local vector file clips the monthly rasters; a GEE
+  FeatureCollection asset ID is used for the AWC/ETo requests instead, leaving the rasters unclipped.
+  Where the rasters are left unclipped, any pixel outside the AWC/ETo download region has no AWC or
+  ETo to pair with, so it stays **NaN** in the `usda_scs`, `ensemble` and `suet` outputs and the run
+  logs a WARNING naming the uncovered pixel count, once per field per process (twice for
+  `usda_scs` and `ensemble`: once for AWC, once for ETo) -
+  `AWC covers only 3.0% of the precipitation grid; 534255 pixel(s) will be NaN in the output. Clip the precipitation to the geometry (clip_to_geometry=True) or widen the geometry.`
+  Clip to the download region, or widen the geometry to span the whole grid, to get full coverage
+- **Directly comparable** to the GEE WRF example, which uses the same domain, period and parameters
+
+### Generated Outputs
+
+```
+WRF_SA_Local/
+├── usda_scs/
+│   ├── effective_precip_{year}_{month}.tif
+│   └── effective_precip_fraction_{year}_{month}.tif
+├── analysis_inputs/
+│   ├── precip_{year}_{month}.tif      # the local WRF grid, as read (mm)
+│   ├── awc.tif                        # HWSD AWC regridded to the WRF grid
+│   └── eto_{year}_{month}.tif         # TerraClimate ETo regridded to the WRF grid
+└── peff_by_method/                     # effective_precip_{year}_{month}.tif in each
+    ├── usda_scs/
+    ├── ensemble/
+    ├── cropwat/
+    ├── fao_aglw/
+    ├── fixed_percentage/
+    ├── dependable_rainfall/
+    ├── farmwest/
+    └── suet/
+```
+
+---
+
+## Local NetCDF Precipitation Example
+
+pyCropWat reads local precipitation from NetCDF as easily as from a directory of GeoTIFFs. This
+example does the whole round trip and proves the two paths agree: it builds a NetCDF from the
+monthly WRF GeoTIFFs, computes effective precipitation from that NetCDF, recomputes the same months
+from the original GeoTIFFs, and asserts the two sets of rasters match. It uses a precipitation-only
+method, so no Earth Engine is involved.
+
+!!! tip "Ready-to-Run Script"
+    [`Examples/LocalPrecip/local_netcdf_example.py`](https://github.com/montimaj/pyCropWat/blob/main/Examples/LocalPrecip/local_netcdf_example.py):
+
+    ```bash
+    python Examples/LocalPrecip/local_netcdf_example.py
+    python Examples/LocalPrecip/local_netcdf_example.py --months 7 8      # quick run
+    python Examples/LocalPrecip/local_netcdf_example.py --skip-build      # reuse the .nc
+    ```
+
+    Defaults: `--year 2005`, `--method cropwat`, `--nodata -9999.0`, all twelve months, output in
+    `./LocalPrecip_NetCDF`.
+
+### Workflow Steps
+
+1. **Build** `precip_YYYY.nc` from the twelve monthly GeoTIFFs - variable `precip`, dimension
+   `time` (`days since 1900-01-01`), `float32`, `_FillValue -9999`, compressed when `netCDF4` or
+   `h5netcdf` is installed (the `scipy` backend is used as an uncompressed NetCDF3 fallback)
+2. **Inspect** the file through `open_local_precipitation()` and log kind, month count, year range,
+   grid, CRS, bounds and the first month's mean
+3. **Compute** effective precipitation from the NetCDF into `from_netcdf/`
+4. **Recompute** the same months from the GeoTIFFs into `from_geotiff/` and compare both rasters
+   pixel-by-pixel (agreement within `1e-4` mm, with matching NaN masks, is asserted)
+
+### Input Data
+
+| Property | Value |
+|----------|-------|
+| **Layout** | One or more `.nc` files; months come from the `time` coordinate, or from the file name when there is no time axis |
+| **Variable** | Auto-detected (`precip`, `precipitation`, `pr`, `prcp`, `ppt`, `tp`, `RAINNC`, ...) or named with `local_precip_variable` |
+| **Dimensions** | `x`/`lon`/`longitude`/`west_east` and `y`/`lat`/`latitude`/`south_north` are recognised automatically |
+| **CRS** | Taken from the grid mapping when present. `local_precip_crs` **overrides** whatever the file declares (and supplies one when it declares none) - it relabels the grid, it never reprojects |
+| **Units** | Monthly totals, converted with `precip_scale_factor` (e.g. `1000` for metres, `10` for centimetres, `25.4` for inches). A rate such as kg m⁻² s⁻¹ cannot be converted by any single multiplier, because the factor depends on the length of each month - accumulate to monthly totals first |
+
+### Python Example
+
+```python
+from pycropwat import EffectivePrecipitation, open_local_precipitation
+
+# Inspect the file first
+with open_local_precipitation('./LocalPrecip_NetCDF/precip_2005.nc',
+                              variable='precip',
+                              nodata=-9999) as src:
+    print(src.kind, len(src), src.year_range, src.crs, src.shape)
+    print(src.available_months()[:3])
+
+ep = EffectivePrecipitation(
+    local_precip='./LocalPrecip_NetCDF/precip_2005.nc',
+    local_precip_variable='precip',
+    local_precip_nodata=-9999,
+    method='cropwat'
+)
+
+results = ep.process(output_dir='./LocalPrecip_NetCDF/from_netcdf', n_workers=4)
+```
+
+A multi-file stack works the same way - pass a directory with `local_precip_pattern='*.nc'`, or a
+glob such as `'./netcdf/precip_*.nc'`. Add `local_precip_crs='EPSG:4326'` when the file declares no
+CRS, or to override one it declares wrongly - the grid is relabelled in place, never reprojected.
+
+### CLI Example
+
+```bash
+pycropwat process \
+    --local-precip ./LocalPrecip_NetCDF/precip_2005.nc \
+    --local-precip-variable precip \
+    --local-precip-nodata -9999 \
+    --method cropwat \
+    --output ./LocalPrecip_NetCDF/from_netcdf
+```
+
+Add `--local-precip-crs EPSG:4326` for a file that carries no CRS, or to override one it declares
+wrongly. The flag relabels the grid; it never reprojects it.
+
+### Key Features
+
+- **Time-axis aware**: months are read from the NetCDF `time` coordinate (standard and `cftime`
+  calendars), falling back to file-name dating when there is no usable time axis
+- **Variable auto-detection**: common precipitation variable names are found automatically; an
+  ambiguous file raises a `ValueError` naming the candidates
+- **Flexible grids**: non-standard dimension names are recognised, 1-D coordinates are derived from
+  2-D curvilinear coordinates when needed, and south-up grids are flipped to north-up
+- **Thread-safe reads**: NetCDF handles are shared, so reads are serialised with a lock while the
+  parallel `process()` path fans months out across Dask threads
+- **`_FillValue`/`missing_value` honoured**, plus any extra `local_precip_nodata` sentinel
+- **Verified equivalence**: the script asserts the NetCDF and GeoTIFF results agree to within
+  `1e-4` mm, exiting non-zero if they do not
+
+### Generated Outputs
+
+```
+LocalPrecip_NetCDF/
+├── precip_2005.nc                              # built in step 1
+├── from_netcdf/
+│   ├── effective_precip_{year}_{month}.tif
+│   └── effective_precip_fraction_{year}_{month}.tif
+└── from_geotiff/
+    ├── effective_precip_{year}_{month}.tif
+    └── effective_precip_fraction_{year}_{month}.tif
+```

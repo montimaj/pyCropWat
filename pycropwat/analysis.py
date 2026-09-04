@@ -56,6 +56,13 @@ Notes
 All raster operations preserve geospatial metadata (CRS, transform) and
 support both in-memory and file-based workflows.
 
+Every floating-point raster written by this module - aggregates,
+climatologies, anomalies and trend fields - declares NaN as its GeoTIFF
+nodata value, because those products can legitimately contain NaN for pixels
+with no valid input. This is a metadata-only change relative to pyCropWat
+< 1.3.0, which wrote no nodata tag: for NaN-free input the pixel values are
+bit-for-bit identical, only the tag is new.
+
 See Also
 --------
 pycropwat.core : Core effective precipitation calculations.
@@ -64,6 +71,7 @@ pycropwat.methods : Effective precipitation calculation methods.
 
 import logging
 import warnings
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Union, Optional, List, Tuple, Literal, Dict
 import numpy as np
@@ -86,6 +94,50 @@ SEASONS = {
 
 # Aggregation types
 AggregationType = Literal['sum', 'mean', 'min', 'max', 'std']
+
+
+@contextmanager
+def _empty_slice_std_warning_suppressed():
+    """
+    Silence NumPy's ``Degrees of freedom <= 0 for slice.`` RuntimeWarning.
+
+    A standard deviation taken over a pixel that is NaN at *every* time step has
+    no degrees of freedom left, so NumPy warns and returns NaN. NaN is exactly
+    the answer wanted for such pixels, which makes the warning pure noise - and
+    a fatal error for callers running under ``-W error::RuntimeWarning``.
+
+    The filter is scoped to this one message and category, so genuine numerical
+    warnings (overflow, invalid value, divide by zero) still surface.
+    """
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            'ignore',
+            message='Degrees of freedom <= 0 for slice',
+            category=RuntimeWarning
+        )
+        yield
+
+
+def _write_raster_with_nodata(
+    data: xr.DataArray,
+    output_path: Union[str, Path]
+) -> None:
+    """
+    Write a derived raster to GeoTIFF, declaring NaN as the nodata value.
+
+    Aggregates, anomalies and trend fields can all legitimately contain NaN
+    (pixels with no valid input at any time step, or too few finite samples to
+    fit), so the nodata value has to travel with the file - otherwise downstream
+    readers see NaN as an ordinary data value.
+
+    Integer rasters cannot hold NaN, so they are written exactly as before: this
+    is the path taken by the Earth Engine workflow, whose downloads use
+    ``defaultValue=0`` and never produce NaN.
+    """
+    out = data
+    if np.issubdtype(out.dtype, np.floating):
+        out = out.rio.write_nodata(np.nan, encoded=False, inplace=False)
+    out.rio.to_raster(output_path, compress='LZW')
 
 
 class TemporalAggregator:
@@ -120,6 +172,14 @@ class TemporalAggregator:
     # Growing season (April-October)
     growing = agg.custom_aggregate(2020, months=[4, 5, 6, 7, 8, 9, 10])
     ```
+
+    Notes
+    -----
+    Aggregation skips missing steps, but a pixel that is NaN at *every* step
+    stays NaN instead of collapsing to the reduction's identity element. Because
+    of that, aggregates saved to ``output_path``/``output_dir`` declare NaN as
+    the GeoTIFF nodata value whenever the output is floating point. Only the
+    metadata is new - for NaN-free input the pixel values are unchanged.
     """
     
     def __init__(
@@ -240,6 +300,7 @@ class TemporalAggregator:
         
         output_path : str or Path, optional
             Path to save output raster. If None, returns DataArray only.
+            Floating-point outputs declare NaN as the file's nodata value.
             
         Returns
         -------
@@ -278,8 +339,9 @@ class TemporalAggregator:
             Default is 'sum'.
         
         output_path : str or Path, optional
-            Path to save output raster.
-            
+            Path to save output raster. Floating-point outputs declare NaN as
+            the file's nodata value.
+
         Returns
         -------
         xr.DataArray or None
@@ -319,7 +381,7 @@ class TemporalAggregator:
         result.attrs['aggregation'] = method
         
         if output_path:
-            result.rio.to_raster(output_path, compress='LZW')
+            self._write_raster(result, output_path)
             logger.info(f"Saved: {output_path}")
         
         return result
@@ -353,7 +415,8 @@ class TemporalAggregator:
             Default is 'sum'.
         
         output_path : str or Path, optional
-            Path to save output raster.
+            Path to save output raster. Floating-point outputs declare NaN as
+            the file's nodata value.
         
         output_name : str, optional
             Name for output attributes.
@@ -407,7 +470,7 @@ class TemporalAggregator:
             result.attrs['name'] = output_name
         
         if output_path:
-            result.rio.to_raster(output_path, compress='LZW')
+            self._write_raster(result, output_path)
             logger.info(f"Saved: {output_path}")
         
         return result
@@ -445,8 +508,9 @@ class TemporalAggregator:
             Aggregation method. Default is 'sum'.
         
         output_path : str or Path, optional
-            Path to save output raster.
-            
+            Path to save output raster. Floating-point outputs declare NaN as
+            the file's nodata value.
+
         Returns
         -------
         xr.DataArray or None
@@ -481,25 +545,81 @@ class TemporalAggregator:
             cross_year=cross_year
         )
     
+    @staticmethod
+    def _all_missing_mask(
+        data: xr.DataArray,
+        dim: str
+    ) -> Optional[xr.DataArray]:
+        """
+        Locate pixels that are NaN at *every* step along ``dim``.
+
+        Returns None when no such pixel exists, or when the dtype cannot hold
+        NaN at all, so that all-valid stacks (e.g. Earth Engine downloads, which
+        use ``defaultValue=0`` and never produce NaN) take exactly the same code
+        path as before.
+        """
+        if not np.issubdtype(data.dtype, np.floating):
+            return None
+
+        all_missing = data.isnull().all(dim=dim)
+        if not bool(all_missing.any()):
+            return None
+
+        return all_missing
+
     def _apply_aggregation(
         self,
         data: xr.DataArray,
-        method: AggregationType
+        method: AggregationType,
+        dim: str = 'time'
     ) -> xr.DataArray:
-        """Apply aggregation method along time dimension."""
+        """
+        Apply aggregation method along the stacking dimension.
+
+        Aggregation is skipna (a pixel missing in *some* steps is aggregated
+        over the steps that do exist), but a pixel that is NaN in *every* step
+        stays NaN instead of collapsing to the reduction's identity element -
+        ``sum`` would otherwise report exactly 0.0 mm for nodata pixels, making
+        them indistinguishable from genuinely dry land.
+        """
         if method == 'sum':
-            return data.sum(dim='time')
+            result = data.sum(dim=dim)
         elif method == 'mean':
-            return data.mean(dim='time')
+            result = data.mean(dim=dim)
         elif method == 'min':
-            return data.min(dim='time')
+            result = data.min(dim=dim)
         elif method == 'max':
-            return data.max(dim='time')
+            result = data.max(dim=dim)
         elif method == 'std':
-            return data.std(dim='time')
+            # An all-NaN pixel has no degrees of freedom; NumPy warns and
+            # returns NaN, which is the value this method wants anyway.
+            with _empty_slice_std_warning_suppressed():
+                result = data.std(dim=dim)
         else:
             raise ValueError(f"Unknown aggregation method: {method}")
-    
+
+        all_missing = self._all_missing_mask(data, dim)
+        if all_missing is not None:
+            attrs = dict(result.attrs)
+            result = result.where(~all_missing)
+            result.attrs = attrs
+
+        return result
+
+    @staticmethod
+    def _write_raster(
+        data: xr.DataArray,
+        output_path: Union[str, Path]
+    ) -> None:
+        """
+        Write an aggregate to GeoTIFF, declaring NaN as the nodata value.
+
+        Overridable seam over :func:`_write_raster_with_nodata`, the single
+        helper every NaN-capable writer in this module shares so that
+        aggregates, anomalies and trend fields carry the same nodata metadata.
+        """
+        _write_raster_with_nodata(data, output_path)
+
     def multi_year_climatology(
         self,
         start_year: int,
@@ -523,7 +643,8 @@ class TemporalAggregator:
             Months to include. If None, calculates for each month.
         
         output_dir : str or Path, optional
-            Directory to save output rasters.
+            Directory to save output rasters. Floating-point outputs declare
+            NaN as the file's nodata value.
             
         Returns
         -------
@@ -545,7 +666,7 @@ class TemporalAggregator:
             
             if arrays:
                 stacked = xr.concat(arrays, dim='year', join='override')
-                clim = stacked.mean(dim='year')
+                clim = self._apply_aggregation(stacked, 'mean', dim='year')
                 clim.attrs = {
                     'long_name': f'climatology_month_{month:02d}',
                     'start_year': start_year,
@@ -558,7 +679,7 @@ class TemporalAggregator:
                     output_dir = Path(output_dir)
                     output_dir.mkdir(parents=True, exist_ok=True)
                     output_path = output_dir / f'climatology_{start_year}_{end_year}_month_{month:02d}.tif'
-                    clim.rio.to_raster(output_path, compress='LZW')
+                    self._write_raster(clim, output_path)
                     logger.info(f"Saved climatology: {output_path}")
         
         return climatology
@@ -592,6 +713,13 @@ class StatisticalAnalyzer:
     # Calculate trend
     trend, pvalue = stats.calculate_trend(start_year=2000, end_year=2020, month=6)
     ```
+
+    Notes
+    -----
+    Anomalies and trend fields are NaN wherever the input is missing or has too
+    few finite samples, and are written through the same helper as
+    :class:`TemporalAggregator`'s output, so they declare NaN as the GeoTIFF
+    nodata value too.
     """
     
     def __init__(
@@ -635,8 +763,9 @@ class StatisticalAnalyzer:
             Default is 'absolute'.
         
         output_path : str or Path, optional
-            Path to save output raster.
-            
+            Path to save output raster. Floating-point outputs declare NaN as
+            the file's nodata value.
+
         Returns
         -------
         xr.DataArray or None
@@ -662,7 +791,10 @@ class StatisticalAnalyzer:
         
         clim_stacked = xr.concat(clim_arrays, dim='year', join='override')
         clim_mean = clim_stacked.mean(dim='year')
-        clim_std = clim_stacked.std(dim='year')
+        # A pixel that is NaN in every climatology year has no degrees of
+        # freedom; NumPy warns and returns NaN, which is the wanted result.
+        with _empty_slice_std_warning_suppressed():
+            clim_std = clim_stacked.std(dim='year')
         
         # Calculate anomaly
         if anomaly_type == 'absolute':
@@ -687,7 +819,7 @@ class StatisticalAnalyzer:
         anomaly.attrs['climatology_period'] = f'{clim_start}-{clim_end}'
         
         if output_path:
-            anomaly.rio.to_raster(output_path, compress='LZW')
+            _write_raster_with_nodata(anomaly, output_path)
             logger.info(f"Saved anomaly: {output_path}")
         
         return anomaly
@@ -720,7 +852,8 @@ class StatisticalAnalyzer:
             Default is 'linear'.
         
         output_dir : str or Path, optional
-            Directory to save output rasters.
+            Directory to save output rasters. Floating-point outputs declare
+            NaN as the file's nodata value.
             
         Returns
         -------
@@ -779,13 +912,13 @@ class StatisticalAnalyzer:
             output_dir.mkdir(parents=True, exist_ok=True)
             
             suffix = f'month_{month:02d}' if month else 'annual'
-            slope.rio.to_raster(
-                output_dir / f'trend_slope_{start_year}_{end_year}_{suffix}.tif',
-                compress='LZW'
+            _write_raster_with_nodata(
+                slope,
+                output_dir / f'trend_slope_{start_year}_{end_year}_{suffix}.tif'
             )
-            pvalue.rio.to_raster(
-                output_dir / f'trend_pvalue_{start_year}_{end_year}_{suffix}.tif',
-                compress='LZW'
+            _write_raster_with_nodata(
+                pvalue,
+                output_dir / f'trend_pvalue_{start_year}_{end_year}_{suffix}.tif'
             )
             logger.info(f"Saved trend analysis to {output_dir}")
         
@@ -2140,9 +2273,14 @@ def export_to_netcdf(
             times.append(pd.Timestamp(year=year, month=month, day=1))
             
             da = rioxarray.open_rasterio(f).squeeze('band', drop=True)
-            # Set nodata explicitly to avoid warning
+            # Set nodata explicitly to avoid warning. An undeclared file that
+            # nonetheless carries NaN (local precipitation input) must be
+            # tagged with NaN, not 0 - tagging 0 would both hide the real gaps
+            # and mark genuinely dry pixels as missing. Files with no NaN keep
+            # the historical 0 fill value used by the Earth Engine workflow.
             if da.rio.nodata is None:
-                da = da.rio.write_nodata(0)
+                fill = np.nan if bool(da.isnull().any()) else 0
+                da = da.rio.write_nodata(fill)
             arrays.append(da)
         except (ValueError, IndexError):
             logger.warning(f"Could not parse date from: {f.name}")

@@ -87,6 +87,120 @@ ep = EffectivePrecipitation(
 )
 ```
 
+### Local Precipitation Input
+
+Pass `local_precip` to read monthly precipitation from disk instead of downloading it from Earth
+Engine. `asset_id` and `precip_band` are then unused (they are `Optional[str] = None` since v1.3.0),
+and `start_year`/`end_year` are inferred from the files when omitted:
+
+```python
+from pycropwat import EffectivePrecipitation
+
+ep = EffectivePrecipitation(
+    local_precip='../pyCropWat_Data/Precip',   # directory, NetCDF file, or glob
+    local_precip_pattern='Precip_*.tif',
+    local_precip_nodata=-9999,
+    method='cropwat'
+)
+
+# No Earth Engine at all for precipitation-only methods
+results = ep.process(output_dir='./outputs', n_workers=4)
+```
+
+#### New Constructor Arguments
+
+All local-precipitation arguments are appended after the existing ones, so existing positional and
+keyword calls are unchanged.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `local_precip` | `str` or `Path` | `None` | Local precipitation to use **instead of** GEE: a directory of monthly rasters, a single NetCDF file (or a directory of them), or a glob string such as `'./Precip/Precip_*.tif'`. Not compatible with `method='pcml'` |
+| `local_precip_pattern` | `str` | `'*.tif'` | Glob used when `local_precip` is a directory |
+| `local_precip_variable` | `str` | `None` | NetCDF variable holding precipitation. Auto-detected when `None` |
+| `local_precip_nodata` | `float` | `None` | Additional nodata sentinel, applied on top of the value stored in the file metadata (e.g. `-9999`). Matching pixels become NaN and propagate as NaN to both output rasters |
+| `local_precip_crs` | `str` | `None` | CRS **override**, e.g. `'EPSG:4326'`. Replaces whatever CRS the files declare (logged at INFO) and supplies one when they declare none. It relabels the grid in place - values and transform are untouched, nothing is reprojected |
+| `local_precip_date_regex` | `str` | `None` | Regular expression with named groups `year` and `month`, used to date files the built-in parser cannot read, e.g. `r'(?P<month>\d{2})_(?P<year>\d{4})'` |
+| `clip_to_geometry` | `bool` | `True` | Clip local precipitation rasters to `geometry_path` when it points at a local vector file. No effect on GEE precipitation, which is always clipped server-side. Setting it to `False` keeps the full grid, but pixels outside the AWC/ETo download region then stay NaN in `usda_scs`/`ensemble`/`suet` outputs |
+
+`precip_scale_factor` applies to local files too, so use it to convert your units to millimetres per
+month (e.g. `1000` for metres). It is a single multiplier, so it cannot turn a rate such as
+kg m⁻² s⁻¹ into a monthly total - accumulate those to monthly totals before pyCropWat reads them.
+
+Related changes to existing arguments:
+
+| Parameter | Change |
+|-----------|--------|
+| `asset_id` | Now `Optional[str] = None`. Required only when `local_precip` is `None` and `method != 'pcml'` |
+| `precip_band` | Now `Optional[str] = None`. Same rule as `asset_id` |
+| `geometry_path` / `gee_geometry_asset` | Optional with `local_precip`. Without either, the extent of the local files is used |
+
+Omitting a precipitation source altogether raises `ValueError("No precipitation source provided...")`.
+
+#### What Still Comes From Earth Engine
+
+| Method | Earth Engine required with `local_precip`? |
+|--------|--------------------------------------------|
+| `cropwat`, `fao_aglw`, `fixed_percentage`, `dependable_rainfall`, `farmwest` | **No** - `ee.Initialize()` is never called; runs offline |
+| `usda_scs`, `ensemble`, `suet` | **Yes** - AWC and/or ETo are still downloaded from GEE |
+| `pcml` | Not supported - raises `ValueError` (pre-computed GEE product) |
+
+A GEE `FeatureCollection` geometry (`gee_geometry_asset`, or a `geometry_path` that is a GEE asset)
+also requires Earth Engine, regardless of method.
+
+Local precipitation with AWC and ETo still coming from Earth Engine:
+
+```python
+ep = EffectivePrecipitation(
+    local_precip='../pyCropWat_Data/Precip',
+    local_precip_pattern='Precip_*.tif',
+    local_precip_nodata=-9999,
+    geometry_path='basin.geojson',      # clips the local rasters
+    start_year=2005,
+    end_year=2010,
+    method='ensemble',
+    gee_project='my-gee-project',
+    method_params={
+        'awc_asset': 'projects/sat-io/open-datasets/FAO/HWSD_V2_SMU',
+        'awc_band': 'AWC',
+        'awc_scale_factor': 0.001,
+        'eto_asset': 'IDAHO_EPSCOR/TERRACLIMATE',
+        'eto_band': 'pet',
+        'eto_scale_factor': 0.1,
+        'eto_is_daily': False,
+        'rooting_depth': 2.0,
+        'mad_factor': 1.0
+    }
+)
+ep.process(output_dir='./outputs', n_workers=4)
+```
+
+Local NetCDF input with an explicit variable and CRS:
+
+```python
+ep = EffectivePrecipitation(
+    local_precip='./wrf_precip.nc',
+    local_precip_variable='RAINNC',
+    local_precip_crs='EPSG:4326',   # override: relabels the grid, never reprojects
+    method='fao_aglw'
+)
+```
+
+!!! warning "AWC/ETo coverage"
+    `usda_scs`, `ensemble` and `suet` still download AWC and ETo from Earth Engine for the
+    geometry you give them. Any part of the local precipitation grid the download did not cover
+    stays **NaN** in the outputs - pyCropWat does not backfill it - and the run logs a WARNING
+    naming the uncovered pixel count, once per field per process (twice for `usda_scs` and
+    `ensemble`: once for AWC, once for ETo):
+
+    ```
+    AWC covers only 3.0% of the precipitation grid; 534255 pixel(s) will be NaN in the output. Clip the precipitation to the geometry (clip_to_geometry=True) or widen the geometry.
+    ```
+
+    Clipping to the geometry (`clip_to_geometry=True`, the default) or widening the geometry gives
+    full coverage.
+
+See [Local Precipitation Data](local-data.md) for the complete guide.
+
 ### Custom Resolution
 
 ```python
@@ -116,6 +230,123 @@ results = ep.process(
 # Sequential processing (useful for debugging)
 results = ep.process_sequential(output_dir='./outputs')
 ```
+
+## LocalPrecipitationSource Class
+
+`pycropwat.local.LocalPrecipitationSource` is the reader behind `local_precip`. Use it directly when
+you want to inspect a dataset, or to pull monthly grids without running the full workflow.
+
+```python
+from pycropwat import LocalPrecipitationSource, open_local_precipitation, parse_year_month
+```
+
+### Constructor
+
+```python
+LocalPrecipitationSource(
+    path: Union[str, Path],                                   # directory of rasters, a raster/NetCDF file, or a glob string
+    pattern: str = '*.tif',                                   # glob applied when `path` is a directory
+    variable: Optional[str] = None,                           # NetCDF variable; auto-detected when None
+    scale_factor: float = 1.0,                                # multiplier applied to every returned array (source units -> mm)
+    nodata: Optional[Union[float, Sequence[float]]] = None,   # extra nodata sentinel(s), in addition to the file metadata
+    crs: Optional[Union[str, CRS]] = None,                    # CRS override: relabels the grid, replacing any declared CRS
+    date_regex: Optional[str] = None,                         # custom regex with named groups 'year' and 'month'
+    time_dim: str = 'time',                                   # NetCDF time coordinate name
+    x_dim: Optional[str] = None,                              # NetCDF X dimension; auto-detected when None
+    y_dim: Optional[str] = None                               # NetCDF Y dimension; auto-detected when None
+)
+```
+
+Files are indexed up front (cheap); pixel data is read only when `get_month()` is called.
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `kind` | `str` | `'raster'` for one-file-per-month rasters, `'netcdf'` otherwise |
+| `files` | `List[Path]` | The data files backing this source, sorted |
+| `crs` | `CRS` | Coordinate reference system of the source data |
+| `bounds` | `Tuple[float, float, float, float]` | `(minx, miny, maxx, maxy)` in EPSG:4326 lon/lat degrees |
+| `native_bounds` | `Tuple[float, float, float, float]` | `(minx, miny, maxx, maxy)` in the source CRS |
+| `year_range` | `Tuple[int, int]` | `(first_year, last_year)` present in the source |
+| `resolution` | `Tuple[float, float]` | `(x_resolution, y_resolution)` as positive values in CRS units |
+| `shape` | `Tuple[int, int]` | `(n_rows, n_cols)` of every monthly grid |
+
+### Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `available_months()` | `List[Tuple[int, int]]` | Sorted `(year, month)` pairs present in the source |
+| `has_month(year, month)` | `bool` | Whether that month can be read |
+| `get_month(year, month)` | `Optional[xr.DataArray]` | The monthly grid, or `None` when the month is missing |
+| `close()` | `None` | Release open NetCDF handles (a no-op in raster mode); safe to call twice |
+
+`len(src)` gives the number of months available, and `repr(src)` summarises kind, files, months,
+year range, CRS and shape.
+
+Every array returned by `get_month()` has dims exactly `('y', 'x')`, dtype `float32`, values in
+millimetres (`scale_factor` applied), nodata as `NaN`, a descending (north-up) `y` coordinate, the
+source CRS attached via rioxarray, and attrs `{'units', 'long_name', 'year', 'month', 'source'}`.
+
+### Usage
+
+```python
+from pycropwat import LocalPrecipitationSource
+
+src = LocalPrecipitationSource(
+    '../pyCropWat_Data/Precip',
+    pattern='Precip_*.tif',
+    nodata=-9999
+)
+print(src.kind, len(src), src.year_range)   # raster 264 (2000, 2021)
+print(src.crs, src.shape, src.resolution)   # EPSG:4326 (689, 799) (0.0397..., 0.0397...)
+print(src.bounds)                           # (-71.3018, -40.3510, -39.5434, -12.9648)
+
+da = src.get_month(2005, 7)                 # xr.DataArray, dims ('y', 'x'), mm
+print(da.dims, da.shape, float(da.mean()))
+src.close()
+```
+
+The source is also a context manager, which is the safest way to use NetCDF inputs:
+
+```python
+from pycropwat import open_local_precipitation
+
+# open_local_precipitation() is a thin factory; kwargs are forwarded unchanged
+with open_local_precipitation('precip_2000_2020.nc',
+                              variable='tp',
+                              scale_factor=1000.0) as src:   # metres -> mm
+    for year, month in src.available_months():
+        da = src.get_month(year, month)
+```
+
+### parse_year_month()
+
+```python
+parse_year_month(name: Union[str, Path], date_regex: Optional[str] = None) -> Optional[Tuple[int, int]]
+```
+
+Extracts `(year, month)` from a file name, stem, path or arbitrary string. Built-in layouts are
+`YYYY_MM`, `YYYY-MM`, `YYYYMM` and `YYYY.MM`; the last plausible match in the string wins, so
+prefixes such as `Precip_` never confuse it. Returns `None` when nothing matched.
+
+```python
+from pycropwat import parse_year_month
+
+parse_year_month('Precip_2005_07.tif')       # (2005, 7)
+parse_year_month('pr200507')                 # (2005, 7)
+parse_year_month('/data/2019/x-2005-07.nc')  # (2005, 7)
+parse_year_month('no_date_here.tif')         # None
+
+# Custom layout: MM_YYYY
+parse_year_month('rain_07_2005.tif',
+                 date_regex=r'(?P<month>\d{2})_(?P<year>\d{4})')   # (2005, 7)
+```
+
+`date_regex` must define both named groups, otherwise a `ValueError` is raised.
+
+Full generated reference: [Local Data API](../api/local.md). Task-oriented guide:
+[Local Precipitation Data](local-data.md).
 
 ## Effective Precipitation Methods
 
@@ -271,20 +502,11 @@ custom = agg.custom_aggregate(
     output_path='./may_aug_mean_2020.tif'
 )
 
-# Multi-year climatology (long-term average)
-# Note: climatology() is an alias for multi_year_climatology()
-climatology = agg.climatology(
-    start_year=1990,
-    end_year=2020,
-    method='mean',
-    output_dir='./climatology/'
-)
-
-# Or use the explicit method name
+# Multi-year climatology (per-month long-term mean)
 climatology = agg.multi_year_climatology(
     start_year=1990,
     end_year=2020,
-    method='mean',
+    months=None,  # All months; or specify list [6, 7, 8]
     output_dir='./climatology/'
 )
 ```
@@ -294,10 +516,9 @@ climatology = agg.multi_year_climatology(
 The `StatisticalAnalyzer` class provides anomaly detection, trend analysis, and zonal statistics:
 
 ```python
-from pycropwat.analysis import StatisticalAnalyzer, TemporalAggregator
+from pycropwat.analysis import StatisticalAnalyzer
 
-agg = TemporalAggregator('./outputs')
-stats = StatisticalAnalyzer(agg)
+stats = StatisticalAnalyzer('./outputs')
 
 # Calculate anomaly relative to climatology
 anomaly = stats.calculate_anomaly(
@@ -317,7 +538,8 @@ trend_linear = stats.calculate_trend(
     method='linear',
     output_dir='./trend_linear/'
 )
-# Returns dict with 'slope', 'intercept', 'r_squared', 'p_value' rasters
+# Returns a (slope, pvalue) tuple of DataArrays; output_dir also writes
+# trend_slope_*.tif and trend_pvalue_*.tif
 
 # Trend analysis with Theil-Sen slope and Mann-Kendall test
 trend_sen = stats.calculate_trend(
@@ -326,11 +548,11 @@ trend_sen = stats.calculate_trend(
     method='sen',
     output_dir='./trend_sen/'
 )
-# Returns dict with 'slope', 'p_value' rasters
+# Returns the same (slope, pvalue) tuple as 'linear'
 
 # Zonal statistics by polygon
 zonal_df = stats.zonal_statistics(
-    zones_path='./regions.shp',
+    geometry_path='./regions.shp',
     start_year=2000,
     end_year=2020,
     months=None,  # All months; or specify list [6, 7, 8]
@@ -350,7 +572,7 @@ from pycropwat.analysis import export_to_netcdf, export_to_cog
 export_to_netcdf(
     input_dir='./outputs',
     output_path='./data.nc',
-    variable='effective_precip',
+    variable_name='effective_precip',
     pattern='effective_precip_[0-9]*.tif',  # Excludes fraction files
     compression=True
 )
@@ -412,17 +634,16 @@ viz.plot_interactive_map(
     month=6,
     cmap='YlGnBu',
     opacity=0.7,
-    basemap='OpenStreetMap',
+    zoom_start=6,
     output_path='./map.html'
 )
 
 # Compare two datasets side-by-side with difference map
 fig = viz.plot_comparison(
-    other_input_dir='./terraclimate_outputs',
+    other_dir='./terraclimate_outputs',
     year=2020,
     month=6,
-    label1='ERA5',
-    label2='TerraClimate',
+    labels=('ERA5', 'TerraClimate'),
     cmap='YlGnBu',
     diff_cmap='RdBu',
     output_path='./comparison.png'
@@ -430,23 +651,21 @@ fig = viz.plot_comparison(
 
 # Scatter plot comparison with statistics (R², RMSE, bias)
 fig = viz.plot_scatter_comparison(
-    other_input_dir='./terraclimate_outputs',
+    other_dir='./terraclimate_outputs',
     start_year=2000,
     end_year=2020,
     months=None,  # All months
     sample_size=10000,  # Max points to plot
-    label1='ERA5 (mm)',
-    label2='TerraClimate (mm)',
+    labels=('ERA5 (mm)', 'TerraClimate (mm)'),
     output_path='./scatter.png'
 )
 
 # Annual totals comparison bar chart
 fig = viz.plot_annual_comparison(
-    other_input_dir='./terraclimate_outputs',
+    other_dir='./terraclimate_outputs',
     start_year=2000,
     end_year=2020,
-    label1='ERA5',
-    label2='TerraClimate',
+    labels=('ERA5', 'TerraClimate'),
     output_path='./annual_compare.png'
 )
 ```

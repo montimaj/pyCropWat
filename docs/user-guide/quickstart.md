@@ -40,6 +40,54 @@ ep = EffectivePrecipitation(
 results = ep.process(output_dir='./outputs', n_workers=4)
 ```
 
+## Using Your Own Precipitation Files
+
+Earth Engine is not required for precipitation. Point `local_precip` (Python) or `--local-precip`
+(CLI) at a directory of monthly GeoTIFFs, a NetCDF file, or a glob string, and pyCropWat reads the
+monthly grids straight off disk. `start_year`/`end_year` are inferred from the files when omitted.
+
+**Python:**
+
+```python
+from pycropwat import EffectivePrecipitation
+
+# A directory of monthly rasters named Precip_YYYY_MM.tif
+ep = EffectivePrecipitation(
+    local_precip='../pyCropWat_Data/Precip',
+    local_precip_pattern='Precip_*.tif',
+    local_precip_nodata=-9999,
+    method='cropwat'
+)
+
+# start_year/end_year were omitted, so they come from the file names
+results = ep.process(output_dir='./outputs', n_workers=4)
+```
+
+**CLI:**
+
+```bash
+pycropwat process \
+    --local-precip ../pyCropWat_Data/Precip \
+    --local-precip-pattern 'Precip_*.tif' \
+    --local-precip-nodata -9999 \
+    --method cropwat \
+    --output ./outputs
+```
+
+!!! tip "No Earth Engine, no credentials, no network"
+    The precipitation-only methods (`cropwat`, `fao_aglw`, `fixed_percentage`,
+    `dependable_rainfall`, `farmwest`) combined with local files need **no Earth Engine at all** -
+    `ee.Initialize()` is never called, so the run works offline. `usda_scs`, `ensemble` and `suet`
+    still download AWC and ETo from GEE (and so still need credentials), and `pcml` cannot be
+    combined with local precipitation because it is a pre-computed GEE product.
+
+Local files also work with a geometry: pass `--geometry roi.geojson` (or `geometry_path=`) and the
+monthly rasters are clipped to it - which is also what keeps a hybrid run fully covered, since AWC
+and ETo are downloaded only for that geometry and any precipitation pixel outside it stays `NaN`.
+Supported inputs, NetCDF variables, custom file-name patterns, CRS overrides (`--local-precip-crs`
+relabels the grid, it never reprojects) and hybrid local-precipitation/GEE-AWC workflows are all
+covered in [Local Precipitation Data](local-data.md).
+
 ## Common Precipitation Datasets
 
 pyCropWat works with any monthly precipitation dataset in Google Earth Engine:
@@ -260,7 +308,7 @@ growing_nh = agg.growing_season_aggregate(2020, start_month=4, end_month=10)
 growing_sh = agg.growing_season_aggregate(2020, start_month=10, end_month=3)
 
 # Multi-year climatology
-climatology = agg.climatology(start_year=2000, end_year=2020)
+climatology = agg.multi_year_climatology(start_year=2000, end_year=2020)
 ```
 
 ## Statistical Analysis
@@ -288,10 +336,9 @@ pycropwat analyze zonal --input ./outputs --zones ./regions.shp \
 **Python:**
 
 ```python
-from pycropwat.analysis import StatisticalAnalyzer, TemporalAggregator
+from pycropwat.analysis import StatisticalAnalyzer
 
-agg = TemporalAggregator('./outputs')
-stats = StatisticalAnalyzer(agg)
+stats = StatisticalAnalyzer('./outputs')
 
 # Anomaly calculation
 anomaly = stats.calculate_anomaly(
@@ -308,7 +355,7 @@ trend = stats.calculate_trend(
 
 # Zonal statistics
 zonal = stats.zonal_statistics(
-    zones_path='./regions.shp',
+    geometry_path='./regions.shp',
     start_year=2000, end_year=2020
 )
 ```
@@ -334,7 +381,7 @@ pycropwat export cog --input ./effective_precip_2020_06.tif \
 from pycropwat.analysis import export_to_netcdf, export_to_cog
 
 # Export to NetCDF with time dimension
-export_to_netcdf('./outputs', './data.nc', variable='effective_precip')
+export_to_netcdf('./outputs', './data.nc', variable_name='effective_precip')
 
 # Convert to Cloud-Optimized GeoTIFF
 export_to_cog('./effective_precip_2020_06.tif', './cog_2020_06.tif')
@@ -398,22 +445,22 @@ viz.plot_interactive_map(2020, 6, output_path='./map.html')
 
 # Compare two datasets
 viz.plot_comparison(
-    other_input_dir='./terraclimate_outputs',
+    other_dir='./terraclimate_outputs',
     year=2020, month=6,
-    label1='ERA5', label2='TerraClimate',
+    labels=('ERA5', 'TerraClimate'),
     output_path='./comparison.png'
 )
 
 # Scatter plot with R², RMSE, bias
 viz.plot_scatter_comparison(
-    other_input_dir='./terraclimate_outputs',
+    other_dir='./terraclimate_outputs',
     start_year=2000, end_year=2020,
     output_path='./scatter.png'
 )
 
 # Annual comparison
 viz.plot_annual_comparison(
-    other_input_dir='./terraclimate_outputs',
+    other_dir='./terraclimate_outputs',
     start_year=2000, end_year=2020,
     output_path='./annual_compare.png'
 )
@@ -462,6 +509,8 @@ outputs/
 ## Next Steps
 
 - **Try the Complete Workflow Example**: Run `python Examples/south_america_example.py --analysis-only` to see all features in action using real Rio de la Plata basin data
+- See [Local Precipitation Data](local-data.md) for the full guide to using your own
+  GeoTIFF/NetCDF precipitation files
 - See [CLI Reference](cli.md) for complete command documentation
 - See [Python API](api.md) for advanced programmatic usage
 - See [Examples](../examples.md) for real-world use cases including the [Complete Workflow](../examples.md#example-12-complete-workflow)

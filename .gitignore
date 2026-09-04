@@ -221,9 +221,25 @@ Examples/*
 !Examples/*.py
 !Examples/*.geojson
 
+# Ship the source of the Examples/LocalPrecip/ walkthrough (scripts + its README) while
+# keeping the directories those scripts generate (Peff/AWC/ETo GeoTIFFs, NetCDF stacks)
+# ignored.  The directory itself has to be re-included first: git never descends into an
+# excluded directory, so a negation naming a file inside it would never be reached.
+!Examples/LocalPrecip/
+Examples/LocalPrecip/*
+!Examples/LocalPrecip/*.py
+!Examples/LocalPrecip/*.md
+
 # Other large files
 *.pdf
 *.pptx
 *.gpkg
 calc*.py
-Examples/wrf
+
+# Same treatment for Examples/wrf/: ship the example scripts that the docs link to, and
+# keep the ~7 GB of WRF/ERA5/AgERA5 inputs and the generated peff_ensemble outputs ignored.
+!Examples/wrf/
+Examples/wrf/*
+!Examples/wrf/*.py
+# ...except the untitled scratch script, which no documentation references.
+Examples/wrf/test.py

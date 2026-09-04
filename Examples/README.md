@@ -11,6 +11,9 @@ This directory contains comprehensive example scripts demonstrating the full cap
 | `new_mexico_example.py` | New Mexico (U.S.) | 8 methods | PRISM | Method comparison |
 | `western_us_pcml_example.py` | Western U.S. (17 states) | PCML | PCML GEE Asset | Water year totals, Mean fractions |
 | `ucrb_example.py` | Upper Colorado River Basin | 8 methods | GeoPackage (pre-existing) | Field-scale aggregation |
+| `LocalPrecip/local_precip_quickstart.py` | Any (your own rasters) | `cropwat` (any precipitation-only) | Local monthly GeoTIFFs (no GEE) | - |
+| `LocalPrecip/wrf_south_america_local_example.py` | Rio de la Plata (South America) | `usda_scs` + 8 methods | Local WRF GeoTIFFs + GEE AWC/ETo | 8-method comparison, local files vs GEE asset workflow |
+| `LocalPrecip/local_netcdf_example.py` | Any (your own NetCDF) | `cropwat` (any precipitation-only) | Local NetCDF built from the monthly GeoTIFFs (no GEE) | NetCDF vs GeoTIFF outputs |
 
 ---
 
@@ -550,7 +553,7 @@ python south_america_example.py --gee-project your-project-id
 
 ## Requirements
 
-- Python 3.9+
+- Python 3.10+
 - pyCropWat package installed
 - Google Earth Engine account
 - Access to the study area GEE asset
@@ -884,6 +887,153 @@ Examples/
         ├── az_zones.geojson
         └── *_usda_scs_peff_2000_2024.nc
 ```
+
+---
+
+## 5. Local Precipitation Examples (No GEE Precipitation)
+
+### Overview
+
+The `LocalPrecip/` folder demonstrates pyCropWat v1.3.0's local precipitation input: monthly
+precipitation is read from **your own GeoTIFFs or NetCDF files** instead of being downloaded from
+Google Earth Engine. Precipitation-only methods (`cropwat`, `fao_aglw`, `fixed_percentage`,
+`dependable_rainfall`, `farmwest`) need no Earth Engine at all - `ee.Initialize()` is never called,
+so those runs work offline and without credentials.
+
+See [`LocalPrecip/README.md`](LocalPrecip/README.md) for the full description of each script, its
+command-line options and the expected data layout.
+
+### Scripts
+
+| Script | Input | Method | Default Output | Earth Engine |
+|--------|-------|--------|----------------|--------------|
+| `local_precip_quickstart.py` | Directory of monthly GeoTIFFs | `cropwat` (any precipitation-only) | `./LocalPrecip_Quickstart` | Not used |
+| `wrf_south_america_local_example.py` | WRF South America GeoTIFFs + GEE AWC/ETo | `usda_scs`, then all 8 methods locally | `./WRF_SA_Local` | AWC and ETo only |
+| `local_netcdf_example.py` | NetCDF stack built from the same GeoTIFFs | `cropwat` (any precipitation-only) | `./LocalPrecip_NetCDF` | Not used |
+
+All three read the example rasters from `<repo>/../pyCropWat_Data/Precip` by default and accept
+`--precip-dir` to point at your own monthly data.
+
+### Example Dataset (WRF South America)
+
+| Property | Value |
+|----------|-------|
+| Source | WRF regional climate model output, Rio de la Plata basin domain (South America) |
+| Files | 264 monthly GeoTIFFs named `Precip_YYYY_MM.tif` |
+| Period | January 2000 - December 2021 |
+| CRS / Grid | EPSG:4326, 689 x 799 cells at 0.0397° (~4.4 km) |
+| Extent | 71.30°W - 39.54°W, 40.35°S - 12.96°S |
+| Values | `float32`, millimetres per month, nodata `-9999` |
+
+`wrf_south_america_local_example.py` is the **local-file counterpart** of
+[`wrf/wrf_south_america_example.py`](wrf/wrf_south_america_example.py), which computes the same
+thing from the WRF precipitation GEE asset (`projects/azhydro/assets/WRF-ET-SA`, band `b1`). Same
+domain, same period, same AWC/ETo assets, same parameters and the same output layout - only the
+precipitation source differs.
+
+### AWC and ETo (hybrid runs only)
+
+| Component | GEE Asset | Band | Scaling |
+|-----------|-----------|------|---------|
+| AWC (FAO HWSD) | `projects/sat-io/open-datasets/FAO/HWSD_V2_SMU` | `AWC` | `awc_scale_factor=0.001` (mm/m → volumetric fraction) |
+| ETo (TerraClimate) | `IDAHO_EPSCOR/TERRACLIMATE` | `pet` | `eto_scale_factor=0.1`, `eto_is_daily=False` |
+
+Physical parameters: `rooting_depth=2.0` m, `mad_factor=1.0`. AWC and ETo are reprojected onto the
+local precipitation grid, so the saved inputs align cell-for-cell with `precip_YYYY_MM.tif`.
+
+> ⚠️ AWC and ETo are downloaded only for the geometry the hybrid run is given. Any part of the
+> precipitation grid that download did not cover stays **NaN** in the `usda_scs`, `ensemble` and
+> `suet` outputs - pyCropWat does not backfill it - and the run logs the uncovered fraction once.
+> `wrf_south_america_local_example.py` passes a geometry and lets the rasters be clipped to it, so
+> every output pixel has precipitation, AWC and ETo. Keeping the full grid instead
+> (`clip_to_geometry=False`, or a GEE `FeatureCollection` geometry, which never clips local
+> rasters) is what leaves NaN outside the download region.
+
+### Workflow Steps
+
+1. **Index the local files** - `LocalPrecipitationSource` resolves the directory/glob/NetCDF, dates
+   every month, and reports kind, file count, year range, CRS and grid shape
+2. **Resolve the date range** - `start_year`/`end_year` are inferred from the files when omitted, or
+   clamped to the years that exist on disk; months with no file are skipped with a warning
+3. **Compute effective precipitation** - the configured method runs on the local grid; nodata
+   pixels stay `NaN` in both outputs
+4. **(Hybrid runs) Download AWC and ETo from GEE** - regridded onto the local grid for `ensemble`,
+   `usda_scs` and `suet`; pixels the download did not cover stay `NaN` rather than being filled in
+5. **Analyze** - the outputs are ordinary pyCropWat rasters, so `TemporalAggregator`,
+   `StatisticalAnalyzer`, `Visualizer` and the export helpers all apply
+
+### Usage
+
+```bash
+# Smallest possible run - no Earth Engine
+# Defaults: --method cropwat, 2005, --months 7 8, 4 workers -> ./LocalPrecip_Quickstart
+python LocalPrecip/local_precip_quickstart.py
+python LocalPrecip/local_precip_quickstart.py --method farmwest --months 1 2 3
+
+# WRF South America, local precipitation + GEE AWC/ETo (USDA-SCS, then all 8 methods)
+# Defaults: 2000-2001, 4 workers -> ./WRF_SA_Local
+python LocalPrecip/wrf_south_america_local_example.py
+python LocalPrecip/wrf_south_america_local_example.py --start-year 2000 --end-year 2021 -w 8
+python LocalPrecip/wrf_south_america_local_example.py --calc-only   # step 2 only
+
+# NetCDF round trip - no Earth Engine
+# Builds precip_2005.nc, computes Peff from it, and checks it against the GeoTIFF result
+python LocalPrecip/local_netcdf_example.py
+python LocalPrecip/local_netcdf_example.py --months 7 8 --skip-build
+```
+
+CLI equivalents:
+
+```bash
+# Local GeoTIFFs, precipitation-only method (offline)
+pycropwat process \
+    --local-precip ../../pyCropWat_Data/Precip \
+    --local-precip-pattern 'Precip_*.tif' \
+    --local-precip-nodata -9999 \
+    --method cropwat \
+    --output ./out_local_cropwat
+
+# Local GeoTIFFs, AWC and ETo still from GEE
+pycropwat process \
+    --local-precip ../../pyCropWat_Data/Precip \
+    --local-precip-pattern 'Precip_*.tif' \
+    --local-precip-nodata -9999 \
+    --geometry riodelaplata.geojson \
+    --start-year 2000 --end-year 2021 \
+    --method ensemble \
+    --awc-asset projects/sat-io/open-datasets/FAO/HWSD_V2_SMU \
+    --awc-band AWC --awc-scale-factor 0.001 \
+    --eto-asset IDAHO_EPSCOR/TERRACLIMATE --eto-band pet \
+    --rooting-depth 2.0 --mad-factor 1.0 \
+    --output ./out_local_ensemble
+```
+
+### Outputs
+
+```
+<output-dir>/
+├── effective_precip_{year}_{month}.tif
+└── effective_precip_fraction_{year}_{month}.tif
+
+<input-dir>/                       # only when save_inputs=True
+├── precip_{year}_{month}.tif      # the local grid, as read (mm)
+├── awc.tif                        # hybrid runs only
+└── eto_{year}_{month}.tif         # hybrid runs only
+```
+
+`wrf_south_america_local_example.py` writes that layout as `WRF_SA_Local/usda_scs/`,
+`WRF_SA_Local/analysis_inputs/` and `WRF_SA_Local/peff_by_method/{method}/` (8 methods), mirroring
+`wrf/wrf_south_america_example.py`. `local_netcdf_example.py` writes `precip_{year}.nc` plus
+`from_netcdf/` and `from_geotiff/` and asserts the two agree to within 1e-4 mm.
+
+### Notes
+
+- `--local-precip` cannot be combined with `--method pcml` - PCML is a pre-computed GEE product
+- File names are dated with the `YYYY_MM`, `YYYY-MM`, `YYYYMM` and `YYYY.MM` layouts; anything else
+  needs `--local-precip-date-regex` with named `year` and `month` groups
+- `--scale-factor` also applies to local files, so use it to convert your units to mm per month
+- Use `--eto-scale-factor` when the ETo asset is not in millimetres (TerraClimate `pet` is in
+  0.1 mm units, so it needs `0.1`); the Python equivalent is `eto_scale_factor` in `method_params`
 
 ---
 
